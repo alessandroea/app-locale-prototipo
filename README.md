@@ -1,5 +1,5 @@
 # App Locale – prototipo
 
-Prototipo HTML (ultima: V02, mappa OpenStreetMap) (mappa, posizione, domande sul luogo). Solo test: 1 utente, dati salvati nel browser.
+Prototipo HTML (ultima: V03 – luoghi con stato live, feed, gruppi, amici, profilo; dati di esempio su Richmond) (mappa, posizione, domande sul luogo). Solo test: 1 utente, dati salvati nel browser.
 
 Prova: https://alessandroea.github.io/app-locale-prototipo/
