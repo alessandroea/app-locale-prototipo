@@ -7,10 +7,10 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#ffffff">
-<title>App Locale – V01</title>
+<title>App Locale – V02</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>
-/* V01 prototipo – App Locale (Alessandro & Giovanni)
+/* V02 prototipo (mappa OpenStreetMap) – App Locale (Alessandro & Giovanni)
    Solo test dell'idea: 1 utente, dati salvati nel browser (localStorage). */
 :root{--bg:#fff;--ink:#14202b;--mute:#6b7785;--line:#e3e7ec;--acc:#e5484d;--news:#2f6fe4;--me:#1677ff;--card:#fff;--soft:#f4f6f8}
 *{box-sizing:border-box;min-width:0}
@@ -154,8 +154,13 @@ const alive=()=>db.posts.filter(p=>p.exp>Date.now());
 
 // ---- mappa ----
 const map=L.map('map',{zoomControl:false,attributionControl:true}).setView([51.4613,-0.3037],15); // Richmond come partenza
-L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',{maxZoom:20,subdomains:'abcd',
-  attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/">CARTO</a>'}).addTo(map);
+// Mappa: OpenStreetMap (nessuna chiave). Se le tile non arrivano, passa alla mappa di riserva (Esri).
+let tileErr=0, switched=false;
+const osm=L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,
+  attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'}).addTo(map);
+osm.on('tileerror',()=>{if(++tileErr>4&&!switched){switched=true;map.removeLayer(osm);
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,
+    attribution:'Tiles © Esri — fonti: Esri, HERE, Garmin, OpenStreetMap'}).addTo(map)}});
 const meIcon=L.divIcon({className:'',html:'<div class="me-pin"></div>',iconSize:[18,18],iconAnchor:[9,9]});
 let me=null, meMarker=null, accCircle=null, simMode=false, gpsPos=null, followed=false;
 const layer=L.layerGroup().addTo(map);
