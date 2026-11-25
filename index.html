@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#ffffff">
+<title>App Locale – V01</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+/* V01 prototipo – App Locale (Alessandro & Giovanni)
+   Solo test dell'idea: 1 utente, dati salvati nel browser (localStorage). */
+:root{--bg:#fff;--ink:#14202b;--mute:#6b7785;--line:#e3e7ec;--acc:#e5484d;--news:#2f6fe4;--me:#1677ff;--card:#fff;--soft:#f4f6f8}
+*{box-sizing:border-box;min-width:0}
+html,body{height:100%;margin:0}
+body{font:16px/1.45 -apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif;color:var(--ink);background:var(--bg);overflow:hidden;-webkit-tap-highlight-color:transparent}
+#map{position:fixed;inset:0;z-index:1}
+button{font:inherit;cursor:pointer;border:0;border-radius:12px;min-height:44px;padding:0 16px}
+input,textarea,select{font:inherit;font-size:16px;width:100%;border:1px solid var(--line);border-radius:12px;padding:12px;background:var(--card);color:var(--ink)}
+textarea{resize:none;min-height:88px}
+:focus-visible{outline:3px solid var(--me);outline-offset:2px}
+
+/* barra in alto */
+.top{position:fixed;z-index:10;left:12px;right:12px;top:calc(env(safe-area-inset-top) + 10px);display:flex;gap:8px;align-items:center}
+.place{flex:1;background:var(--card);border-radius:16px;padding:10px 14px;box-shadow:0 4px 18px rgba(0,0,0,.12)}
+.place b{display:block;font-size:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.place small{color:var(--mute);font-size:13px}
+.round{width:48px;height:48px;padding:0;border-radius:50%;background:var(--card);box-shadow:0 4px 18px rgba(0,0,0,.12);display:grid;place-items:center;flex:none}
+.round svg{width:22px;height:22px}
+.round.on{background:var(--ink);color:#fff}
+.sim{position:fixed;z-index:10;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top) + 76px);background:var(--ink);color:#fff;font-size:13px;padding:6px 12px;border-radius:99px;display:none}
+.sim.show{display:block}
+
+/* foglio in basso */
+.sheet{position:fixed;z-index:10;left:0;right:0;bottom:0;background:var(--card);border-radius:20px 20px 0 0;box-shadow:0 -6px 24px rgba(0,0,0,.12);padding:8px 16px calc(env(safe-area-inset-bottom) + 12px);max-height:46vh;display:flex;flex-direction:column}
+.grab{width:40px;height:5px;border-radius:3px;background:var(--line);margin:0 auto 8px}
+.sheet h2{font-size:17px;margin:0 0 8px;display:flex;justify-content:space-between;align-items:baseline}
+.sheet h2 span{font-weight:400;color:var(--mute);font-size:13px}
+.list{overflow-y:auto;flex:1;margin:0 -16px;padding:0 16px}
+.item{display:flex;gap:10px;padding:12px 0;border-bottom:1px solid var(--line);cursor:pointer}
+.dot{width:10px;height:10px;border-radius:50%;margin-top:7px;flex:none;background:var(--acc)}
+.dot.news{background:var(--news)}
+.item p{margin:0;font-weight:600}
+.meta{font-size:13px;color:var(--mute)}
+.empty{color:var(--mute);padding:14px 0;font-size:15px}
+.empty button{margin-top:10px;background:var(--soft);color:var(--ink)}
+.ask{margin-top:10px;background:var(--acc);color:#fff;font-weight:600;width:100%;min-height:50px;font-size:17px}
+
+/* pannelli (domanda / thread) */
+.panel{position:fixed;z-index:20;inset:0;background:rgba(10,20,30,.35);display:none;align-items:flex-end}
+.panel.show{display:flex}
+.box{background:var(--card);width:100%;max-height:88vh;overflow-y:auto;border-radius:20px 20px 0 0;padding:16px 16px calc(env(safe-area-inset-bottom) + 16px)}
+@media(min-width:700px){.panel{align-items:center;justify-content:center}.box{max-width:520px;border-radius:20px}.sheet{left:16px;right:auto;width:400px;bottom:16px;border-radius:20px;max-height:60vh}}
+.box h3{margin:0 0 4px;font-size:20px;line-height:1.25}
+.row{display:flex;gap:8px;margin:12px 0}
+.seg{display:flex;background:var(--soft);border-radius:12px;padding:3px;gap:3px}
+.seg button{flex:1;background:transparent;min-height:40px;font-size:15px;color:var(--mute)}
+.seg button.on{background:var(--card);color:var(--ink);font-weight:600;box-shadow:0 1px 4px rgba(0,0,0,.1)}
+label{display:block;font-size:13px;color:var(--mute);margin:12px 0 6px}
+.btns{display:flex;gap:8px;margin-top:14px}
+.btns button{flex:1}
+.pri{background:var(--ink);color:#fff;font-weight:600}
+.sec{background:var(--soft);color:var(--ink)}
+.ans{padding:10px 12px;background:var(--soft);border-radius:12px;margin:8px 0}
+.ans .meta{margin-top:4px}
+.tag{display:inline-block;font-size:12px;font-weight:600;padding:2px 8px;border-radius:99px;background:#fdeaea;color:var(--acc)}
+.tag.news{background:#e8effd;color:var(--news)}
+.warn{font-size:13px;color:#a15c00;background:#fff4e0;border-radius:10px;padding:8px 10px;margin-top:10px}
+.toast{position:fixed;z-index:30;left:50%;top:calc(env(safe-area-inset-top) + 120px);transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:99px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none;white-space:nowrap}
+.toast.show{opacity:1}
+.leaflet-control-attribution{font-size:10px}
+.me-pin{width:18px;height:18px;border-radius:50%;background:var(--me);border:3px solid #fff;box-shadow:0 0 0 6px rgba(22,119,255,.2)}
+.q-pin{width:30px;height:30px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:var(--acc);border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.3);display:grid;place-items:center}
+.q-pin span{transform:rotate(45deg);color:#fff;font-weight:700;font-size:14px}
+.q-pin.news{background:var(--news)}
+@media(prefers-reduced-motion:reduce){.toast{transition:none}}
+</style>
+</head>
+<body>
+<div id="map" aria-label="Mappa"></div>
+
+<div class="top">
+  <div class="place"><b id="placeName">Sto cercando la tua posizione…</b><small id="placeSub">Consenti l'accesso alla posizione</small></div>
+  <button class="round" id="btnSim" title="Simula posizione: tocca la mappa per spostarti" aria-label="Simula posizione">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/><circle cx="12" cy="12" r="5"/></svg></button>
+  <button class="round" id="btnLocate" title="Torna alla mia posizione" aria-label="Centra sulla mia posizione">
+    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 3 3 10.5l7.5 2.6L13 21z"/></svg></button>
+</div>
+<div class="sim" id="simBadge">Modalità prova: tocca la mappa per spostarti</div>
+
+<section class="sheet" aria-label="Domande vicino a te">
+  <div class="grab"></div>
+  <h2>Vicino a te <span id="count"></span></h2>
+  <div class="list" id="list"></div>
+  <button class="ask" id="btnAsk">Chiedi qualcosa su questo posto</button>
+</section>
+
+<!-- nuova domanda -->
+<div class="panel" id="pAsk" role="dialog" aria-modal="true" aria-labelledby="askTitle">
+  <form class="box" id="askForm">
+    <h3 id="askTitle">Cosa succede qui?</h3>
+    <div class="meta" id="askWhere"></div>
+    <div class="row seg" id="segType">
+      <button type="button" data-v="q" class="on">Domanda</button>
+      <button type="button" data-v="n">Notizia</button>
+    </div>
+    <textarea id="askText" maxlength="280" placeholder="Es. Perché c'è così tanta gente in centro?" required></textarea>
+    <label>Chi può rispondere (raggio della zona)</label>
+    <div class="seg" id="segRadius">
+      <button type="button" data-v="300">300 m</button>
+      <button type="button" data-v="1000" class="on">1 km</button>
+      <button type="button" data-v="5000">5 km</button>
+    </div>
+    <label>Scade dopo</label>
+    <div class="seg" id="segExp">
+      <button type="button" data-v="1">1 ora</button>
+      <button type="button" data-v="3" class="on">3 ore</button>
+      <button type="button" data-v="24">24 ore</button>
+    </div>
+    <div class="btns"><button type="button" class="sec" data-close>Annulla</button><button class="pri">Pubblica</button></div>
+  </form>
+</div>
+
+<!-- thread -->
+<div class="panel" id="pThread" role="dialog" aria-modal="true">
+  <div class="box" id="threadBox"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+{
+const KEY='applocale_v01';
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+// ---- dati locali ----
+let db={posts:[]};
+try{db=JSON.parse(localStorage.getItem(KEY))||db}catch(e){}
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(db))}catch(e){}};
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+
+// ---- utilità ----
+function dist(a,b){const R=6371000,r=x=>x*Math.PI/180,dLa=r(b.lat-a.lat),dLo=r(b.lng-a.lng);
+  const h=Math.sin(dLa/2)**2+Math.cos(r(a.lat))*Math.cos(r(b.lat))*Math.sin(dLo/2)**2;return 2*R*Math.asin(Math.sqrt(h))}
+const fmtD=m=>m<1000?Math.round(m/10)*10+' m':(m/1000).toFixed(m<10000?1:0).replace('.',',')+' km';
+function ago(t){const s=(Date.now()-t)/1000;if(s<60)return'adesso';if(s<3600)return Math.floor(s/60)+' min fa';if(s<86400)return Math.floor(s/3600)+' h fa';return Math.floor(s/86400)+' g fa'}
+function left(t){const m=(t-Date.now())/60000;return m<60?Math.max(1,Math.round(m))+' min':Math.round(m/60)+' h'}
+function toast(t){const e=$('#toast');e.textContent=t;e.classList.add('show');clearTimeout(e._t);e._t=setTimeout(()=>e.classList.remove('show'),2200)}
+const alive=()=>db.posts.filter(p=>p.exp>Date.now());
+
+// ---- mappa ----
+const map=L.map('map',{zoomControl:false,attributionControl:true}).setView([51.4613,-0.3037],15); // Richmond come partenza
+L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',{maxZoom:20,subdomains:'abcd',
+  attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/">CARTO</a>'}).addTo(map);
+const meIcon=L.divIcon({className:'',html:'<div class="me-pin"></div>',iconSize:[18,18],iconAnchor:[9,9]});
+let me=null, meMarker=null, accCircle=null, simMode=false, gpsPos=null, followed=false;
+const layer=L.layerGroup().addTo(map);
+
+function setMe(lat,lng,acc,fromSim){
+  me={lat,lng};
+  if(!meMarker){meMarker=L.marker([lat,lng],{icon:meIcon,zIndexOffset:1000}).addTo(map);
+    accCircle=L.circle([lat,lng],{radius:acc||30,color:'#1677ff',weight:1,fillOpacity:.08}).addTo(map)}
+  else{meMarker.setLatLng([lat,lng]);accCircle.setLatLng([lat,lng])}
+  accCircle.setRadius(fromSim?15:(acc||30));
+  if(!followed){map.setView([lat,lng],16);followed=true}
+  lookup(lat,lng);render();
+}
+
+// nome del luogo (reverse geocoding OpenStreetMap)
+let lastLook=null;
+async function lookup(lat,lng){
+  if(lastLook&&dist(lastLook,{lat,lng})<60)return; lastLook={lat,lng};
+  $('#placeSub').textContent=lat.toFixed(4)+', '+lng.toFixed(4);
+  try{
+    const r=await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=17&accept-language=it`);
+    const j=await r.json(),a=j.address||{};
+    const name=j.name||a.road||a.pedestrian||a.neighbourhood||a.suburb||'Posizione attuale';
+    const area=[a.suburb||a.neighbourhood,a.city||a.town||a.village].filter(Boolean).join(', ');
+    $('#placeName').textContent=name; $('#placeSub').textContent=area||j.display_name||'';
+    placeLabel=name+(area?' · '+area:'');
+  }catch(e){$('#placeName').textContent='Posizione attuale';placeLabel='Posizione attuale'}
+}
+let placeLabel='Posizione attuale';
+
+// GPS
+if('geolocation' in navigator){
+  navigator.geolocation.watchPosition(p=>{gpsPos={lat:p.coords.latitude,lng:p.coords.longitude,acc:p.coords.accuracy};
+      if(!simMode)setMe(gpsPos.lat,gpsPos.lng,gpsPos.acc)},
+    err=>{ $('#placeName').textContent='Posizione non disponibile';
+      $('#placeSub').textContent='Usa ⊕ e tocca la mappa per scegliere dove sei'; toast('GPS non disponibile: usa la modalità prova')},
+    {enableHighAccuracy:true,maximumAge:10000,timeout:15000});
+}
+
+// modalità prova: tocca la mappa per "spostarti" (utile per testare le risposte da lontano)
+$('#btnSim').onclick=()=>{simMode=!simMode;$('#btnSim').classList.toggle('on',simMode);$('#simBadge').classList.toggle('show',simMode);
+  if(!simMode&&gpsPos)setMe(gpsPos.lat,gpsPos.lng,gpsPos.acc);toast(simMode?'Tocca la mappa per spostarti':'Torno al GPS')};
+map.on('click',e=>{if(simMode)setMe(e.latlng.lat,e.latlng.lng,15,true)});
+$('#btnLocate').onclick=()=>{if(me)map.setView([me.lat,me.lng],16);else toast('Posizione non ancora trovata')};
+
+// ---- render lista + pin ----
+function render(){
+  layer.clearLayers();
+  const list=alive().map(p=>({...p,d:me?dist(me,p):null})).sort((a,b)=>(a.d??0)-(b.d??0));
+  list.forEach(p=>{
+    const ic=L.divIcon({className:'',html:`<div class="q-pin ${p.type==='n'?'news':''}"><span>${p.type==='n'?'!':'?'}</span></div>`,iconSize:[30,30],iconAnchor:[15,30]});
+    L.circle([p.lat,p.lng],{radius:p.radius,color:p.type==='n'?'#2f6fe4':'#e5484d',weight:1,fillOpacity:.05,interactive:false}).addTo(layer);
+    L.marker([p.lat,p.lng],{icon:ic}).on('click',()=>openThread(p.id)).addTo(layer);
+  });
+  $('#count').textContent=list.length?list.length+' attive':'';
+  $('#list').innerHTML=list.length?list.map(p=>`<div class="item" data-id="${esc(p.id)}" role="button" tabindex="0">
+      <div class="dot ${p.type==='n'?'news':''}"></div>
+      <div><p>${esc(p.text)}</p><div class="meta">${p.d!=null?'a '+fmtD(p.d)+' · ':''}${ago(p.t)} · ${p.answers.length} rispost${p.answers.length===1?'a':'e'} · scade tra ${left(p.exp)}</div></div></div>`).join('')
+    :`<div class="empty">Nessuna domanda attiva qui intorno.<br>Fai la prima, oppure<br><button id="btnDemo">Aggiungi 3 esempi di prova</button></div>`;
+  const d=$('#btnDemo'); if(d)d.onclick=addDemo;
+}
+$('#list').addEventListener('click',e=>{const it=e.target.closest('.item');if(it)openThread(it.dataset.id)});
+$('#list').addEventListener('keydown',e=>{const it=e.target.closest('.item');if(it&&e.key==='Enter')openThread(it.dataset.id)});
+
+// ---- nuova domanda ----
+function seg(id){const el=$(id);el.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
+  el.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b))});return()=>el.querySelector('.on').dataset.v}
+const getType=seg('#segType'),getRad=seg('#segRadius'),getExp=seg('#segExp');
+$('#segType').addEventListener('click',()=>{$('#askText').placeholder=getType()==='n'?'Es. Chiuso l\'ingresso principale, entrate dal lato fiume':'Es. Perché c\'è così tanta gente in centro?'});
+$('#btnAsk').onclick=()=>{if(!me){toast('Serve la posizione: usa ⊕ e tocca la mappa');return}
+  $('#askWhere').textContent='📍 '+placeLabel;$('#pAsk').classList.add('show');setTimeout(()=>$('#askText').focus(),50)};
+$('#askForm').onsubmit=e=>{e.preventDefault();const text=$('#askText').value.trim();if(!text)return;
+  const p={id:uid(),type:getType(),text,lat:me.lat,lng:me.lng,place:placeLabel,radius:+getRad(),t:Date.now(),exp:Date.now()+getExp()*3600e3,answers:[]};
+  db.posts.push(p);save();$('#askText').value='';closePanels();render();toast('Pubblicata ✓');openThread(p.id)};
+
+// ---- thread ----
+let openId=null;
+function openThread(id){
+  const p=db.posts.find(x=>x.id===id);if(!p)return;openId=id;
+  const d=me?dist(me,p):null, inside=d!=null&&d<=p.radius;
+  $('#threadBox').innerHTML=`
+    <span class="tag ${p.type==='n'?'news':''}">${p.type==='n'?'Notizia':'Domanda'}</span>
+    <h3 style="margin-top:8px">${esc(p.text)}</h3>
+    <div class="meta">📍 ${esc(p.place)} · ${ago(p.t)} · zona ${fmtD(p.radius)} · scade tra ${left(p.exp)}</div>
+    <div style="margin-top:14px">${p.answers.length?p.answers.map(a=>`<div class="ans">${esc(a.text)}
+      <div class="meta">da ${fmtD(a.d)} dal posto · ${ago(a.t)}</div></div>`).join(''):'<div class="empty">Ancora nessuna risposta.</div>'}</div>
+    <label for="ansText">Rispondi ${d!=null?'(sei a '+fmtD(d)+')':''}</label>
+    <textarea id="ansText" maxlength="280" placeholder="Es. C'è un evento in piazza fino alle 18"></textarea>
+    ${inside?'':'<div class="warn">Sei fuori dalla zona: nell\'app vera non potresti rispondere. Usa ⊕ per simulare di essere lì.</div>'}
+    <div class="btns"><button class="sec" data-close>Chiudi</button><button class="pri" id="ansSend">Invia risposta</button></div>
+    <div class="btns"><button class="sec" id="delPost" style="flex:none;color:#c0392b">Elimina</button></div>`;
+  $('#ansSend').onclick=()=>{const t=$('#ansText').value.trim();if(!t)return;
+    p.answers.push({text:t,t:Date.now(),d:d??0});save();render();openThread(id)};
+  $('#delPost').onclick=()=>{db.posts=db.posts.filter(x=>x.id!==id);save();closePanels();render();toast('Eliminata')};
+  $('#pThread').classList.add('show');
+  map.panTo([p.lat,p.lng]);
+}
+function closePanels(){document.querySelectorAll('.panel').forEach(x=>x.classList.remove('show'));openId=null}
+document.addEventListener('click',e=>{if(e.target.matches('[data-close]')||e.target.classList.contains('panel'))closePanels()});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closePanels()});
+
+// ---- esempi di prova attorno alla posizione ----
+function addDemo(){
+  if(!me){toast('Prima serve la posizione');return}
+  const off=(m,a)=>({lat:me.lat+m*Math.cos(a)/111320,lng:me.lng+m*Math.sin(a)/(111320*Math.cos(me.lat*Math.PI/180))});
+  const now=Date.now(),mk=(type,text,m,a,mins,ans)=>({id:uid(),type,text,...off(m,a),place:'Esempio di prova',radius:1000,t:now-mins*60e3,exp:now+3*3600e3,answers:ans});
+  db.posts.push(
+    mk('q','Perché c\'è così tanta gente qui intorno?',250,0.6,12,[{text:'C\'è un mercatino di Natale in piazza fino alle 20',t:now-6*60e3,d:120}]),
+    mk('n','Fila lunga alla stazione: un solo varco aperto',600,2.4,25,[]),
+    mk('q','Qualcuno sa se il parco è aperto a quest\'ora?',900,4.2,40,[{text:'Sì, chiude alle 16:30 d\'inverno',t:now-30*60e3,d:300},{text:'Confermo, ingresso principale aperto',t:now-20*60e3,d:80}]));
+  save();render();toast('3 esempi aggiunti')
+}
+
+// aggiorna tempi ogni minuto
+setInterval(()=>{render();const a=$('#ansText');if(openId&&!(a&&a.value))openThread(openId)},60000);
+render();
+}
+</script>
+</body>
+</html>
