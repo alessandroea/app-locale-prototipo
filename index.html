@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#F3F5F9" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0C1424" media="(prefers-color-scheme: dark)">
-<title>App Locale – V09</title>
+<title>App Locale – V10</title>
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-v6-180.png">
 <link rel="icon" type="image/png" href="icon-v6-192.png">
@@ -236,6 +236,19 @@ label{display:block;font-size:13px;font-weight:600;color:var(--mute);margin:16px
 .composer textarea{min-height:64px}
 .composer .btns{margin-top:10px}
 .qbox{margin:0 0 8px}
+/* V10 */
+.aimg{display:block;width:100%;max-height:320px;object-fit:cover;border-radius:12px;margin:2px 0 8px;background:var(--surface)}
+.gav{border-radius:12px!important}
+.gmembers{display:flex;align-items:center;gap:0;margin:10px 0 4px}
+.gmembers .av{margin-left:-8px;box-shadow:0 0 0 2px var(--surface)}.gmembers .av:first-child{margin-left:0}
+.gmembers .meta{margin-left:10px}
+.swatches{display:flex;gap:10px;margin-top:8px}
+.swatches button{width:34px;height:34px;min-height:34px;border-radius:50%;padding:0;border:3px solid transparent}
+.swatches button.on{border-color:var(--ink)}
+.composer2{margin-top:14px;padding:12px;border-radius:16px;background:var(--surface2)}
+.composer2 textarea{background:var(--surface)}
+.gpost{cursor:pointer}
+.zone-row .meta b{font-weight:600}
 /* V09 */
 .mapf{position:fixed;z-index:9;left:calc(var(--rail) + 12px);top:calc(env(safe-area-inset-top) + 72px);display:flex;gap:6px}
 .mapf .chip{box-shadow:0 4px 14px -4px rgba(15,27,51,.35);border:0;min-height:36px;font-weight:600}
@@ -356,7 +369,7 @@ label{display:block;font-size:13px;font-weight:600;color:var(--mute);margin:16px
       <button class="sec big" id="aOut" type="button">Esci</button>
     </div>
     <p class="amsg" id="aMsg" role="status"></p>
-    <p class="demo">Prototipo V09</p>
+    <p class="demo">Prototipo V10</p>
   </div>
 </div>
 
@@ -370,7 +383,7 @@ const SB_URL='https://tigxpqmedwlwthomvunb.supabase.co';
 const SB_KEY='sb_publishable_np6dcaeo0Hbbd63wlzb1FQ_Nz5_ryoU';
 const APP_URL=location.origin+location.pathname;
 const sb=supabase.createClient(SB_URL,SB_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
-let myId=null,myEmail='',PROF={},FR=[],NOTIFS=[],LOC={};
+let myId=null,myEmail='',PROF={},FR=[],NOTIFS=[],LOC={},GROUPS=[],GMEM=[],GPOSTS=[],ZONES=[];
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const now=()=>Date.now();
@@ -438,26 +451,31 @@ const iso=ms=>new Date(ms).toISOString();
 async function load(){
   $('#loading').classList.remove('hide');
   const since=iso(now()-6*H);
-  const [pl,rp,po,an,vo,pr,fr,nt,rx,lc]=await Promise.all([
+  const [pl,rp,po,an,vo,pr,fr,nt,rx,lc,gr,gm,gp,zn]=await Promise.all([
     sb.from('places').select('id,name,category,lat,lng,info'),
     sb.from('place_reports').select('place_id,status,is_demo,demo_offset_min,created_at').or(`is_demo.eq.true,created_at.gt.${since}`),
     sb.from('posts').select('id,kind,category,place_id,place_label,lat,lng,radius_m,body,author_id,demo_author,is_demo,demo_offset_min,base_votes,base_confirms,best_answer_id,created_at,expires_at,photo_url').or(`is_demo.eq.true,expires_at.gt.${since}`),
-    sb.from('answers').select('id,post_id,body,distance_m,author_id,demo_author,is_demo,demo_offset_min,base_votes,created_at'),
+    sb.from('answers').select('id,post_id,body,distance_m,author_id,demo_author,is_demo,demo_offset_min,base_votes,created_at,photo_url'),
     sb.from('votes').select('user_id,post_id,answer_id'),
-    sb.from('profiles').select('id,display_name,color,avatar_url,username,share_location,share_precision'),
+    sb.from('profiles').select('id,display_name,color,avatar_url,username,share_location,share_precision,alerts_nearby,alert_radius_m'),
     sb.from('friendships').select('id,requester_id,addressee_id,status'),
-    sb.from('notifications').select('id,kind,post_id,body,read_at,created_at').order('created_at',{ascending:false}).limit(100),
+    sb.from('notifications').select('id,kind,post_id,group_id,body,read_at,created_at').order('created_at',{ascending:false}).limit(100),
     sb.from('post_reactions').select('post_id,user_id,kind'),
-    sb.from('locations').select('user_id,lat,lng,accuracy_m,precision,share_until,updated_at')
+    sb.from('locations').select('user_id,lat,lng,accuracy_m,precision,share_until,updated_at'),
+    sb.from('groups').select('id,name,description,color,place_label,created_by,created_at'),
+    sb.from('group_members').select('group_id,user_id,role,joined_at'),
+    sb.from('group_posts').select('id,group_id,parent_id,author_id,body,photo_url,created_at').order('created_at',{ascending:false}).limit(1000),
+    sb.from('followed_zones').select('id,name,lat,lng,radius_m,created_at').order('created_at')
   ]);
   $('#loading').classList.add('hide');
-  const err=[pl,rp,po,an,vo,pr,fr,nt,rx,lc].find(r=>r.error);
+  const err=[pl,rp,po,an,vo,pr,fr,nt,rx,lc,gr,gm,gp,zn].find(r=>r.error);
   if(err){toast('Errore dal database: '+err.error.message);return false}
-  PROF={};pr.data.forEach(p=>PROF[p.id]={n:p.display_name,c:p.color,a:p.avatar_url,u:p.username,sh:p.share_location!==false,sp:p.share_precision||'exact'});
+  PROF={};pr.data.forEach(p=>PROF[p.id]={n:p.display_name,c:p.color,a:p.avatar_url,u:p.username,sh:p.share_location!==false,sp:p.share_precision||'exact',al:p.alerts_nearby!==false,ar:p.alert_radius_m||1000});
+  GROUPS=gr.data;GMEM=gm.data;GPOSTS=gp.data.map(x=>({...x,t:Date.parse(x.created_at)}));ZONES=zn.data;
   if(PROF[myId]){db.me.name=PROF[myId].n}
   LOC={};lc.data.forEach(l=>{const until=l.share_until?Date.parse(l.share_until):null;LOC[l.user_id]={lat:l.lat,lng:l.lng,acc:l.accuracy_m,area:l.precision==='area',until,t:Date.parse(l.updated_at)}});
   FR=fr.data.map(f=>({id:f.id,other:f.requester_id===myId?f.addressee_id:f.requester_id,status:f.status,incoming:f.addressee_id===myId}));
-  NOTIFS=nt.data.map(n=>({id:'db'+n.id,dbId:n.id,text:n.body,t:Date.parse(n.created_at),read:!!n.read_at,post:n.post_id,tab:n.kind.startsWith('friend')?'me':null}));
+  NOTIFS=nt.data.map(n=>({id:'db'+n.id,dbId:n.id,text:n.body,t:Date.parse(n.created_at),read:!!n.read_at,post:n.post_id,group:n.group_id,tab:n.kind.startsWith('friend')?'me':null}));
   const T=r=>r.is_demo?now()-(r.demo_offset_min||0)*M:Date.parse(r.created_at);
   const who=r=>r.author_id?(r.author_id===myId?'me':r.author_id):r.demo_author;
   const vP={},vA={},myP=new Set(),myA=new Set();
@@ -473,7 +491,7 @@ async function load(){
       confirms:(p.base_confirms||0)+x.confirm.size,myConfirm:x.confirm.has(myId),resolves:x.resolved.size,myResolve:x.resolved.has(myId),
       resolved:(p.author_id&&x.resolved.has(p.author_id))||x.resolved.size>=2,
       votes:p.base_votes+(vP[p.id]||0),voted:myP.has(p.id),follow:db.follow.includes(p.id)||p.author_id===myId,demo:p.is_demo,
-      answers:an.data.filter(a=>a.post_id===p.id&&!blocked.has(who(a))).map(a=>({id:a.id,by:who(a),text:a.body,t:T(a),d:a.distance_m,
+      answers:an.data.filter(a=>a.post_id===p.id&&!blocked.has(who(a))).map(a=>({id:a.id,by:who(a),text:a.body,photo:a.photo_url,t:T(a),d:a.distance_m,
         votes:a.base_votes+(vA[a.id]||0),voted:myA.has(a.id),best:a.id===p.best_answer_id,demo:a.is_demo}))}})
     .filter(p=>!blocked.has(p.by));
   return true;
@@ -481,7 +499,8 @@ async function load(){
 let reloadT=null;
 function reloadSoon(){clearTimeout(reloadT);reloadT=setTimeout(async()=>{if(await load()){render();refreshModal()}},400)}
 function refreshModal(){
-  if(modalKind==='thread'&&openId){const ta=$('#ansText');if(!ta||!ta.value)openThread(openId)}
+  if(modalKind==='thread'&&openId){const ta=$('#ansText');if((!ta||!ta.value)&&!ansPhoto)openThread(openId)}
+  if((modalKind==='group'||modalKind==='gpost')&&openId){const ta=$('#gText');if((!ta||!ta.value)&&!gPhoto)(modalKind==='group'?openGroup:openGPost)(openId)}
   if(modalKind==='place'&&openId)openPlace(openId);
   if(modalKind==='profile'&&openId)openProfile(openId);
 }
@@ -495,7 +514,7 @@ async function run(promise,okMsg){
 /* ---------- tempo reale: le novità arrivano subito; gli avvisi li crea il database ---------- */
 function subscribe(){
   const ch=sb.channel('app-locale-live');
-  ['posts','answers','votes','place_reports','friendships','post_reactions','profiles','locations'].forEach(t=>ch.on('postgres_changes',{event:'*',schema:'public',table:t},()=>reloadSoon()));
+  ['posts','answers','votes','place_reports','friendships','post_reactions','profiles','locations','groups','group_members','group_posts'].forEach(t=>ch.on('postgres_changes',{event:'*',schema:'public',table:t},()=>reloadSoon()));
   ch.on('postgres_changes',{event:'INSERT',schema:'public',table:'notifications',filter:'user_id=eq.'+myId},e=>{toast(String(e.new.body||'Nuovo avviso').slice(0,90));reloadSoon()});
   ch.subscribe();
 }
@@ -533,7 +552,17 @@ let myAcc=null,lastShare=null,geoDenied=false;
 const wantShare=()=>!!myId&&(PROF[myId]||{}).sh!==false;
 const mySharing=()=>{const l=LOC[myId];return wantShare()&&!!(l&&(!l.until||l.until>now()))};
 const isLive=l=>now()-l.t<5*M;
+let lastAlert=null;
+const wantAlerts=()=>!!myId&&(PROF[myId]||{}).al!==false;
+function maybeAlert(force){ // solo per gli avvisi: il database tiene la zona (~100 m), nessuno la vede
+  if(!myId||!me||!wantAlerts())return;
+  const moved=lastAlert?dist(lastAlert,me):1e9,age=lastAlert?now()-lastAlert.t:1e9;
+  if(!force&&moved<300&&age<10*M)return;
+  lastAlert={lat:me.lat,lng:me.lng,t:now()};
+  sb.rpc('set_alert_position',{p_lat:me.lat,p_lng:me.lng}).then(()=>{});
+}
 function maybeShare(force){
+  maybeAlert(force);
   if(!myId||!me||!wantShare())return;
   const moved=lastShare?dist(lastShare,me):1e9,age=lastShare?now()-lastShare.t:1e9;
   if(!force&&moved<120&&age<60e3)return;
@@ -564,6 +593,23 @@ function watchUser(input,msg){let t=null;
   input.addEventListener('input',()=>{const v=input.value.toLowerCase().replace(/[^a-z0-9._]/g,'');if(v!==input.value)input.value=v;
     clearTimeout(t);t=setTimeout(()=>checkUser(v,msg),450)})}
 
+const CAM='<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>';
+let ansPhoto=null,gPhoto=null;
+function bindPhoto(box,onChange,initial,label){ // scelta foto con anteprima; la foto viene ridotta (e perde i dati GPS dello scatto)
+  if(!box)return;let blob=initial||null;
+  const draw=()=>{box.innerHTML=blob?`<img src="${URL.createObjectURL(blob)}" alt="Anteprima"><span class="meta">Foto pronta</span><button type="button">Togli</button>`
+      :`<label>${CAM}${label||'Aggiungi una foto'}<input type="file" accept="image/*" class="hide"></label>`;
+    const b=box.querySelector('button');if(b)b.onclick=()=>{blob=null;onChange(null);draw()};
+    const inp=box.querySelector('input');if(inp)inp.onchange=async()=>{const f=inp.files[0];inp.value='';if(!f)return;
+      try{blob=await fitJpeg(f,1280);onChange(blob);draw()}catch(e){toast('Questa immagine non si apre, provane un\'altra')}}};
+  draw();
+}
+async function uploadPhoto(blob){
+  const path=`${myId}/${Date.now()}.jpg`,up=await sb.storage.from('post-photos').upload(path,blob,{contentType:'image/jpeg',cacheControl:'31536000'});
+  if(up.error){toast('Foto non caricata: '+up.error.message);return null}
+  return sb.storage.from('post-photos').getPublicUrl(path).data.publicUrl;
+}
+const inZones=p=>ZONES.some(z=>dist(p,z)<=z.radius_m);
 async function fitJpeg(file,max=1280){
   const img=await new Promise((ok,ko)=>{const i=new Image();i.onload=()=>ok(i);i.onerror=ko;i.src=URL.createObjectURL(file)});
   const k=Math.min(1,max/Math.max(img.naturalWidth,img.naturalHeight)),c=document.createElement('canvas');
@@ -595,10 +641,11 @@ $('#avFile').addEventListener('change',async e=>{
 
 /* ---------- apertura da una notifica: #post=… o #tab=… ---------- */
 function routeHash(){
-  const h=location.hash,m=h.match(/post=([0-9a-f-]{36})/),t=h.match(/tab=(map|feed|groups|act|me)/);
-  if(!m&&!t)return;
+  const h=location.hash,m=h.match(/post=([0-9a-f-]{36})/),t=h.match(/tab=(map|feed|groups|act|me)/),g=h.match(/group=([0-9a-f-]{36})/);
+  if(!m&&!t&&!g)return;
   history.replaceState(null,'',location.pathname+location.search);
   if(t)setTab(t[1]);
+  if(g){setTab('groups');if(GROUPS.some(x=>x.id===g[1]))openGroup(g[1]);else load().then(ok=>{if(ok){render();openGroup(g[1])}})}
   if(m){if(db.posts.some(p=>p.id===m[1]))openThread(m[1]);else load().then(ok=>{if(ok){render();openThread(m[1])}})}
 }
 window.addEventListener('hashchange',()=>{if(myId)routeHash()});
@@ -679,6 +726,7 @@ function renderMap(){
     const ic=L.divIcon({className:'',html:`<div class="q-pin u-${u} ${fresh?'fresh':''} ${p.resolved?'res':''}">${p.resolved?'✓':p.type==='n'?'!':'?'}</div>`,iconSize:[36,36],iconAnchor:[18,18]});
     L.marker([p.lat,p.lng],{icon:ic}).on('click',()=>openThread(p.id)).addTo(layer);
   });
+  if(mapF==='all')ZONES.forEach(z=>L.circle([z.lat,z.lng],{radius:z.radius_m,color:'#2f6fe4',weight:1.5,dashArray:'6 6',fill:false,interactive:false}).addTo(layer));
   (mapF==='urgent'?[]:friendLocs()).forEach(f=>{
     const live=isLive(f);
     if(f.area)L.circle([f.lat,f.lng],{radius:1000,color:'#1F9D63',weight:1,fillOpacity:.04,interactive:false}).addTo(layer);
@@ -737,27 +785,102 @@ function renderFeed(){
   if(feedF==='new')list.sort((a,b)=>b.t-a.t);
   if(feedF==='friends')list=list.filter(p=>isFriend(p.by));
   if(feedF==='follow')list=list.filter(p=>p.follow||p.by==='me');
+  if(feedF==='zones')list=list.filter(inZones).sort((a,b)=>b.t-a.t);
   if(feedCat)list=list.filter(p=>p.cat===feedCat);
-  const F=[['near','Vicino a me'],['urgent','Urgenti'],['new','Più recenti'],['hot','Popolari'],['friends','Amici'],['follow','Seguiti']];
-  $('#v-feed').innerHTML=`<h1>Feed</h1><p class="sub">Cosa succede adesso nelle tue zone: ${esc(db.me.areas.join(', '))}</p>
+  const F=[['near','Vicino a me'],['zones','Le mie zone'],['urgent','Urgenti'],['new','Più recenti'],['hot','Popolari'],['friends','Amici'],['follow','Seguiti']];
+  $('#v-feed').innerHTML=`<h1>Feed</h1><p class="sub">${ZONES.length?'Cosa succede vicino a te e in '+esc(ZONES.map(z=>z.name).join(', ')):'Cosa succede adesso vicino a te. Segui le tue zone da Profilo.'}</p>
     <div class="chips">${F.map(([k,l])=>`<button class="chip ${feedF===k?'on':''}" data-act="feedF" data-id="${k}">${l}</button>`).join('')}</div>
     <div class="chips"><button class="chip ${!feedCat?'on':''}" data-act="feedCat" data-id="">Tutte</button>${Object.entries(CATS).map(([k,l])=>`<button class="chip ${feedCat===k?'on':''}" data-act="feedCat" data-id="${k}">${l}</button>`).join('')}</div>
-    ${list.length?list.map(p=>postCard(p,true)).join(''):'<p class="empty">Niente qui per ora. Prova un altro filtro.</p>'}
+    ${list.length?list.map(p=>postCard(p,true)).join(''):feedF==='zones'&&!ZONES.length?'<p class="empty">Non segui ancora nessuna zona. <a href="#" data-act="zoneNew">Segui la zona dove sei</a></p>':'<p class="empty">Niente qui per ora. Prova un altro filtro.</p>'}
     <p class="demo">“Esempio” indica le conversazioni demo; le altre sono vostre.</p>`;
 }
+const GCOL=['#2f6fe4','#30a46c','#e5484d','#f76b15','#8e4ec6','#12a594'];
+const gMembers=id=>GMEM.filter(m=>m.group_id===id);
+const amIn=id=>GMEM.some(m=>m.group_id===id&&m.user_id===myId);
+const amOwner=id=>GMEM.some(m=>m.group_id===id&&m.user_id===myId&&m.role==='owner');
+const gTopics=id=>GPOSTS.filter(x=>x.group_id===id&&!x.parent_id);
+const gReplies=id=>GPOSTS.filter(x=>x.parent_id===id).sort((a,b)=>a.t-b.t);
+const gLast=id=>Math.max(0,...GPOSTS.filter(x=>x.group_id===id).map(x=>x.t));
+const gby=x=>x.author_id===myId?'me':x.author_id;
+const gAv=(g,cls)=>`<span class="av gav ${cls||''}" style="background:${esc(g.color)}">${esc(ini(g.name))}</span>`;
 function renderGroups(){
-  const mine=db.groups.filter(g=>g.joined),other=db.groups.filter(g=>!g.joined);
-  const gc=g=>`<button class="card" data-act="group" data-id="${g.id}"><div class="who"><span class="av" style="background:${g.c};border-radius:10px">${esc(ini(g.name))}</span><div><b>${esc(g.name)}</b><div class="meta">${g.members+(g.joined?1:0)} membri · ${g.posts.length} discussioni</div></div></div><p class="meta" style="margin:8px 0 0">${esc(g.desc)}</p></button>`;
-  $('#v-groups').innerHTML=`<h1>Gruppi <span class="phase">Fase 2</span></h1><p class="sub">Forum di interesse legati alla zona, non a un punto preciso.</p>
-    <div class="sec-t">I tuoi gruppi</div>${mine.length?mine.map(gc).join(''):'<p class="empty">Non sei ancora in nessun gruppo.</p>'}
-    <div class="sec-t">Consigliati vicino a te</div>${other.map(gc).join('')}<p class="demo">Dati di esempio</p>`;
+  const mine=GROUPS.filter(g=>amIn(g.id)).sort((a,b)=>gLast(b.id)-gLast(a.id)),other=GROUPS.filter(g=>!amIn(g.id)).sort((a,b)=>gMembers(b.id).length-gMembers(a.id).length||gLast(b.id)-gLast(a.id));
+  const gc=g=>{const n=gMembers(g.id).length,t=gTopics(g.id).length,last=gLast(g.id);
+    return`<button class="card" data-act="group" data-id="${g.id}"><div class="who">${gAv(g)}<div><b>${esc(g.name)}</b><div class="meta">${n} membr${n===1?'o':'i'}, ${t} discussion${t===1?'e':'i'}${g.place_label?' · '+esc(g.place_label):''}</div></div></div>${g.description?`<p class="meta" style="margin:8px 0 0">${esc(g.description)}</p>`:''}${last?`<div class="meta" style="margin-top:6px">Ultimo messaggio ${ago(last)}</div>`:''}</button>`};
+  $('#v-groups').innerHTML=`<h1>Gruppi</h1><p class="sub">Forum aperti per zona o passione: tutti leggono, chi si unisce scrive e riceve gli avvisi.</p>
+    <button class="pri" style="width:100%;margin-bottom:14px" data-act="gNew">Crea un gruppo</button>
+    <div class="sec-t">I tuoi gruppi</div>${mine.length?mine.map(gc).join(''):'<p class="empty">Non sei ancora in nessun gruppo. Unisciti a uno qui sotto o creane uno.</p>'}
+    ${other.length?`<div class="sec-t">Altri gruppi</div>${other.map(gc).join('')}`:''}`;
+}
+function topicHtml(x,full){
+  const r=gReplies(x.id),mine=x.author_id===myId,g=GROUPS.find(y=>y.id===x.group_id);
+  return`<div class="ans ${full?'':'gpost'}" ${full?'':`data-act="gTopic" data-id="${x.id}"`}><div class="who"><span class="who" data-act="profile" data-id="${esc(gby(x))}">${av(gby(x))}<b>${esc(user(gby(x)).n)}</b></span><span class="meta">${ago(x.t)}</span></div>
+    <p>${esc(x.body)}</p>${x.photo_url?`<img class="aimg" src="${esc(x.photo_url)}" alt="Foto" loading="lazy">`:''}
+    ${full?(mine||(g&&amOwner(g.id))?`<div class="acts"><button class="red" data-act="gDel" data-id="${x.id}">Elimina</button></div>`:''):`<div class="meta">${r.length?r.length+' rispost'+(r.length===1?'a':'e')+', ultima '+ago(r[r.length-1].t):'Nessuna risposta, tocca per rispondere'}</div>`}</div>`;
+}
+function openGroup(id){
+  const g=GROUPS.find(x=>x.id===id);if(!g){toast('Questo gruppo non esiste più');closeModal();return}
+  const mem=gMembers(id),inG=amIn(id),own=amOwner(id),topics=gTopics(id).sort((a,b)=>Math.max(b.t,...gReplies(b.id).map(r=>r.t))-Math.max(a.t,...gReplies(a.id).map(r=>r.t)));
+  const draft=$('#gText')&&openId===id&&modalKind==='group'?$('#gText').value:'';
+  openModal(`<div class="who">${gAv(g,'lg')}<div><h3 style="margin:0">${esc(g.name)}</h3><div class="meta">${g.place_label?esc(g.place_label)+' · ':''}${mem.length} membr${mem.length===1?'o':'i'}</div></div></div>
+    ${g.description?`<p>${esc(g.description)}</p>`:''}
+    ${mem.length?`<div class="gmembers">${mem.slice(0,8).map(m=>av(m.user_id===myId?'me':m.user_id)).join('')}<span class="meta">${mem.slice(0,3).map(m=>esc(user(m.user_id===myId?'me':m.user_id).n.split(' ')[0])).join(', ')}${mem.length>3?' e altri '+(mem.length-3):''}</span></div>`:''}
+    <div class="acts" style="margin-top:10px">${inG?(own?'<span class="near">Amministratore</span>':`<button data-act="gLeave" data-id="${id}">Esci dal gruppo</button>`):`<button class="ok" data-act="gJoin" data-id="${id}">Unisciti al gruppo</button>`}<button data-act="gShare" data-id="${id}">Condividi</button>${own?`<button class="red" data-act="gRemove" data-id="${id}">Elimina gruppo</button>`:''}</div>
+    ${inG?`<div class="composer2"><textarea id="gText" maxlength="500" placeholder="Apri una discussione nel gruppo">${esc(draft)}</textarea><div class="photo-pick" id="gPick"></div>
+      <div class="btns" style="margin-top:10px"><button class="pri" data-act="gPost" data-id="${id}">Pubblica</button></div></div>`:'<p class="meta" style="margin-top:12px">Unisciti per scrivere e ricevere un avviso a ogni nuova discussione.</p>'}
+    <label>${topics.length} discussion${topics.length===1?'e':'i'}</label>
+    ${topics.length?topics.map(x=>topicHtml(x)).join(''):'<p class="empty">Ancora nessuna discussione. Apri la prima.</p>'}
+    <div class="btns"><button class="sec" data-close>Chiudi</button></div>`,'group');
+  if(openId!==id||modalKind!=='group')gPhoto=null;
+  openId=id;modalKind='group';if(inG)bindPhoto($('#gPick'),b=>gPhoto=b,gPhoto);
+}
+function openGPost(id){
+  const x=GPOSTS.find(y=>y.id===id);if(!x){toast('Discussione eliminata');closeModal();return}
+  const g=GROUPS.find(y=>y.id===x.group_id),inG=amIn(x.group_id),own=amOwner(x.group_id),r=gReplies(id);
+  const draft=$('#gText')&&openId===id&&modalKind==='gpost'?$('#gText').value:'';
+  openModal(`<a href="#" class="meta" data-act="group" data-id="${x.group_id}">‹ ${esc(g?g.name:'Gruppo')}</a>
+    ${topicHtml(x,true)}
+    <label>${r.length} rispost${r.length===1?'a':'e'}</label>
+    ${r.map(y=>`<div class="ans" style="margin-left:14px"><div class="who"><span class="who" data-act="profile" data-id="${esc(gby(y))}">${av(gby(y))}<b>${esc(user(gby(y)).n)}</b></span><span class="meta">${ago(y.t)}</span></div><p>${esc(y.body)}</p>${y.photo_url?`<img class="aimg" src="${esc(y.photo_url)}" alt="Foto" loading="lazy">`:''}
+      ${y.author_id===myId||own?`<div class="acts"><button class="red" data-act="gDel" data-id="${y.id}">Elimina</button></div>`:''}</div>`).join('')}
+    ${inG?`<div class="composer"><textarea id="gText" maxlength="500" placeholder="Rispondi">${esc(draft)}</textarea><div class="photo-pick" id="gPick"></div>
+      <div class="btns"><button class="sec" data-act="group" data-id="${x.group_id}">Indietro</button><button class="pri" data-act="gReply" data-id="${id}">Rispondi</button></div></div>`
+      :`<div class="btns"><button class="sec" data-act="group" data-id="${x.group_id}">Indietro</button><button class="pri" data-act="gJoin" data-id="${x.group_id}">Unisciti per rispondere</button></div>`}`,'gpost');
+  if(openId!==id||modalKind!=='gpost')gPhoto=null;
+  openId=id;modalKind='gpost';if(inG)bindPhoto($('#gPick'),b=>gPhoto=b,gPhoto);
+}
+function openNewGroup(){
+  let col=GCOL[0];
+  openModal(`<h3>Nuovo gruppo</h3><p class="meta">Un forum aperto: tutti lo leggono, chi si unisce scrive. Tu sarai l'amministratore e potrai togliere i messaggi.</p>
+    <form id="gForm"><label for="gName">Nome</label><input id="gName" maxlength="50" required placeholder="Es. Runner di Richmond Park">
+    <label for="gDesc">Di cosa parla</label><textarea id="gDesc" maxlength="200" placeholder="Es. Giri del parco, gruppi del sabato, sicurezza al buio"></textarea>
+    <label for="gPlace">Zona (facoltativa)</label><input id="gPlace" maxlength="80" value="${esc((placeLabel||'').split(' · ').pop()==='Posizione attuale'?'':(placeLabel||'').split(' · ').pop())}" placeholder="Es. Richmond">
+    <label>Colore</label><div class="swatches">${GCOL.map((c,i)=>`<button type="button" class="${i?'':'on'}" style="background:${c}" data-c="${c}" aria-label="Colore ${i+1}"></button>`).join('')}</div>
+    <div class="btns"><button type="button" class="sec" data-close>Annulla</button><button class="pri">Crea il gruppo</button></div></form>`,'gnew');
+  document.querySelectorAll('.swatches button').forEach(b=>b.onclick=()=>{col=b.dataset.c;document.querySelectorAll('.swatches button').forEach(x=>x.classList.toggle('on',x===b))});
+  $('#gForm').onsubmit=async e=>{e.preventDefault();const n=$('#gName').value.trim();if(n.length<3){toast('Il nome deve avere almeno 3 lettere');return}
+    const btn=$('#gForm .pri');btn.disabled=true;btn.textContent='Creo…';
+    const id=await run(sb.rpc('create_group',{p_name:n,p_description:$('#gDesc').value.trim(),p_color:col,p_place_label:$('#gPlace').value.trim()}),'Gruppo creato ✓');
+    if(id){setTab('groups');openGroup(id)}else{btn.disabled=false;btn.textContent='Crea il gruppo'}};
+  setTimeout(()=>$('#gName').focus(),60);
+}
+function openZoneNew(c){ // c = {name,lat,lng}
+  let rad=c.big?5000:2000;
+  openModal(`<h3>Segui una zona</h3><p class="meta">Ricevi un avviso per ogni domanda o notizia in questa zona, anche quando non ci sei.</p>
+    <form id="zForm"><label for="zName">Nome</label><input id="zName" maxlength="60" required value="${esc(c.name)}" placeholder="Es. Casa, Lavoro, Trescore">
+    <label>Quanto grande</label><div class="seg" id="zRad">${[[1000,'1 km'],[2000,'2 km'],[5000,'5 km'],[10000,'10 km']].map(([v,l])=>`<button type="button" class="${v===rad?'on':''}" data-v="${v}">${l}</button>`).join('')}</div>
+    <div class="meta" style="margin-top:8px">Centro: ${esc(c.where||c.name)}</div>
+    <div class="btns"><button type="button" class="sec" data-close>Annulla</button><button class="pri">Segui</button></div></form>`,'znew');
+  document.querySelectorAll('#zRad button').forEach(b=>b.onclick=()=>{rad=+b.dataset.v;document.querySelectorAll('#zRad button').forEach(x=>x.classList.toggle('on',x===b))});
+  $('#zForm').onsubmit=async e=>{e.preventDefault();const n=$('#zName').value.trim();if(!n)return;
+    if(await run(sb.from('followed_zones').insert({name:n,lat:+c.lat.toFixed(5),lng:+c.lng.toFixed(5),radius_m:rad}),'Segui '+n+' ✓'))closeModal()};
 }
 const allN=()=>[...NOTIFS,...db.notifs];
 function renderAct(){
   clearBadge();
-  $('#v-act').innerHTML=`<h1>Attività</h1><p class="sub">Risposte alle tue domande, nuove domande e richieste di amicizia</p>
+  $('#v-act').innerHTML=`<h1>Attività</h1><p class="sub">Domande vicino a te e nelle tue zone, risposte, gruppi e amici</p>
     ${pushState!=='on'?`<button class="card" data-act="tab" data-id="me"><b>Attiva le notifiche sul telefono</b><div class="meta">${esc(pushTxt())}</div></button>`:''}
-    <div class="box2">${allN().sort((a,b)=>b.t-a.t).map(n=>`<div class="row" data-n="${n.id}" ${n.post?`data-act="thread" data-id="${n.post}"`:n.tab?`data-act="tab" data-id="${n.tab}"`:''} style="cursor:pointer">
+    <div class="box2">${allN().sort((a,b)=>b.t-a.t).map(n=>`<div class="row" data-n="${n.id}" ${n.post?`data-act="thread" data-id="${n.post}"`:n.group?`data-act="group" data-id="${n.group}"`:n.tab?`data-act="tab" data-id="${n.tab}"`:''} style="cursor:pointer">
       <span class="st"><i style="background:${n.read?'#c3cad2':'var(--acc)'}"></i></span><div><div style="font-weight:${n.read?400:600}">${esc(n.text)}</div><div class="meta">${ago(n.t)}</div></div></div>`).join('')}</div>
     <div class="btns"><button class="sec" data-act="readAll">Segna tutte come lette</button></div>`;
 }
@@ -803,20 +926,22 @@ function renderMe(){
     <div class="sec-t">Notifiche</div>
     <div class="box2">
       <div class="row"><div><b>Notifiche sul telefono</b><div class="meta">${esc(pushTxt())}</div></div>${pushState==='on'?'<button class="small sec" data-act="pushOff">Disattiva</button>':pushState==='off'?'<button class="small pri" data-act="pushOn">Attiva</button>':''}</div>
-      <div class="row" style="display:block"><b>Avvisami di domande entro</b>${seg('radius',[['500','500 m'],['1000','1 km'],['5000','5 km']]).replace('class="seg"','class="seg" style="margin-top:8px"')}</div>
-      <div class="row"><div><b>Non disturbare 23–7</b><div class="meta">Max 3 notifiche l'ora negli altri orari</div></div>${sw('quiet',db.me.quiet)}</div>
+      <div class="row"><div><b>Avvisi da chi è vicino</b><div class="meta">${wantAlerts()?'Ti avvisiamo quando qualcuno chiede o segnala qualcosa vicino a dove sei. Per farlo il database tiene solo la tua zona (circa 100 m), nessuno la vede.':'Spenti: non ricevi le domande fatte vicino a te.'}</div></div>
+        <button class="sw ${wantAlerts()?'on':''}" data-act="alertToggle" role="switch" aria-checked="${wantAlerts()}" aria-label="Avvisi da chi è vicino"></button></div>
+      ${wantAlerts()?`<div class="row" style="display:block"><b>Avvisami di domande entro</b><div class="seg" style="margin-top:8px">${[[500,'500 m'],[1000,'1 km'],[3000,'3 km'],[5000,'5 km']].map(([v,l])=>`<button class="${(PROF[myId]||{}).ar===v?'on':''}" data-act="alertRad" data-id="${v}">${l}</button>`).join('')}</div><div class="meta" style="margin-top:6px">Conta anche la zona scelta da chi chiede: vale la più piccola delle due.</div></div>`:''}
+      <div class="row"><div><b>Non disturbare 23–7 <span class="phase">Fase 2</span></b><div class="meta">Max 3 notifiche l'ora negli altri orari</div></div>${sw('quiet',db.me.quiet)}</div>
     </div>
     <div class="sec-t">Zone che segui</div>
-    <div class="box2">${db.me.areas.map((a,i)=>`<div class="row"><div><b>${esc(a)}</b><div class="meta">Ricevi le novità anche quando non sei lì</div></div><button class="small sec" data-act="areaDel" data-id="${i}">Togli</button></div>`).join('')}
-      <div class="row"><button class="small pri" data-act="areaAdd">Segui la zona dove sono adesso</button></div></div>
+    <div class="box2">${ZONES.map(z=>`<div class="row zone-row"><div class="pick" data-act="zoneShow" data-id="${z.id}"><div><b>${esc(z.name)}</b><div class="meta">Entro ${fmtD(z.radius_m)}${me?', a '+fmtD(dist(me,z))+' da te':''} · ${alive().filter(p=>dist(p,z)<=z.radius_m).length} attive ora</div></div></div><button class="small sec" data-act="zoneDel" data-id="${z.id}">Togli</button></div>`).join('')||'<div class="row"><div class="meta">Segui casa, lavoro o il tuo paese: ricevi le domande e le notizie di quella zona anche quando non ci sei.</div></div>'}
+      <div class="row">${ZONES.length<10?`<button class="small pri" data-act="zoneNew">Segui la zona dove sono</button><button class="small sec" data-act="search">Cerca un posto</button>`:'<span class="meta">Puoi seguire al massimo 10 zone.</span>'}</div></div>
     <div class="sec-t">Account</div>
     <div class="box2">
       <div class="row"><div><b>${esc(myEmail)}</b><div class="meta">Accesso attivo · domande e risposte nel database condiviso</div></div><button class="small sec" data-act="logout">Esci</button></div>
       <div class="row"><div><b>Accedi con Apple</b><div class="meta">Nell'app iPhone: niente password, email nascosta</div></div><span class="phase">Fase 2</span></div>
       <div class="row"><div><b>Utenti bloccati</b><div class="meta">${(db.blocked||[]).length} bloccati</div></div></div>
-      <div class="row"><button class="small sec red" data-act="reset">Ripristina gruppi, amici e impostazioni demo</button></div>
+      <div class="row"><button class="small sec red" data-act="reset">Ripristina amici e impostazioni di esempio</button></div>
     </div>
-    <p class="demo">Prototipo V09. Domande, risposte, voti, conferme, amicizie, avvisi e foto sono nel database; gruppi e impostazioni restano su questo telefono.</p>`;
+    <p class="demo">Prototipo V10. Domande, risposte, foto, gruppi, zone seguite, amicizie e avvisi sono nel database; restano su questo telefono solo gli amici di esempio e alcune impostazioni.</p>`;
 }
 
 /* ---------- profilo di una persona ---------- */
@@ -929,28 +1054,17 @@ function openThread(id){
     <label>${answers.length} rispost${answers.length===1?'a':'e'}</label>
     ${answers.length?answers.map(a=>{const au=user(a.by),near=a.d!=null&&a.d<=p.radius;return`<div class="ans ${a.best?'best':''}">
       <div class="who"><span class="who" data-act="profile" data-id="${esc(a.by)}">${av(a.by)}<b>${esc(au.n)}</b></span>${near?'<span class="near">Era lì</span>':''}${a.best?'<span class="near">Migliore</span>':''}</div>
-      <p>${esc(a.text)}</p><div class="meta">${a.d!=null?'da '+fmtD(a.d)+' dal posto':'distanza non nota'} · ${ago(a.t)}${a.demo?' · esempio':''}</div>
+      <p>${esc(a.text)}</p>${a.photo?`<a href="${esc(a.photo)}" target="_blank" rel="noopener"><img class="aimg" src="${esc(a.photo)}" alt="Foto della risposta" loading="lazy"></a>`:''}<div class="meta">${a.d!=null?'da '+fmtD(a.d)+' dal posto':'distanza non nota'} · ${ago(a.t)}${a.demo?' · esempio':''}</div>
       <div class="acts"><button class="${a.voted?'on':''}" data-act="voteA" data-id="${p.id}" data-v="${a.id}">▲ Utile ${a.votes}</button>
       ${p.by==='me'&&!a.best&&a.by!=='me'?`<button data-act="best" data-id="${p.id}" data-v="${a.id}">Segna migliore</button>`:''}
       ${a.by!=='me'?`<button data-act="flag" data-id="${a.by}">Segnala</button>`:`<button class="red" data-act="delA" data-id="${p.id}" data-v="${a.id}">Elimina</button>`}</div></div>`}).join(''):'<p class="empty">Ancora nessuna risposta. Chi è in zona riceve un avviso.</p>'}
     <div class="composer">
     ${inside?'':'<div class="warn" style="margin:0 0 8px">Sei fuori dalla zona: la tua risposta non avrà il bollino “Era lì”.</div>'}
     <textarea id="ansText" maxlength="280" aria-label="Rispondi" placeholder="Rispondi${d!=null?' (sei a '+fmtD(d)+')':''}: cosa vedi da lì?">${esc(draft)}</textarea>
+    <div class="photo-pick" id="ansPick"></div>
     <div class="btns"><button class="sec" data-close>Chiudi</button><button class="pri" data-act="sendAns" data-id="${p.id}">Invia risposta</button></div></div>`,'thread');
-  openId=id;
-}
-
-function openGroup(id){
-  const g=db.groups.find(x=>x.id===id);if(!g)return;
-  openModal(`<div class="who"><span class="av lg" style="background:${g.c};border-radius:16px">${esc(ini(g.name))}</span><div><h3 style="margin:0">${esc(g.name)}</h3><div class="meta">${g.members+(g.joined?1:0)} membri</div></div></div>
-    <p>${esc(g.desc)}</p>
-    <button class="${g.joined?'sec':'pri'}" style="width:100%" data-act="join" data-id="${g.id}">${g.joined?'Esci dal gruppo':'Unisciti al gruppo'}</button>
-    <label>Discussioni</label>
-    ${g.posts.slice().sort((a,b)=>b.t-a.t).map(x=>`<div class="ans"><div class="who">${av(x.by)}<b>${esc(user(x.by).n)}</b><span class="meta">${ago(x.t)}</span></div><p>${esc(x.text)}</p><div class="meta">${x.replies} rispost${x.replies===1?'a':'e'}</div></div>`).join('')}
-    ${g.joined?`<label for="gText">Scrivi nel gruppo</label><textarea id="gText" maxlength="280" placeholder="Apri una discussione"></textarea>
-    <div class="btns"><button class="sec" data-close>Chiudi</button><button class="pri" data-act="gPost" data-id="${g.id}">Pubblica</button></div>`:'<div class="btns"><button class="sec" data-close>Chiudi</button></div>'}
-    <p class="demo">Gruppo di esempio</p>`,'group');
-  openId=id;
+  if(openId!==id)ansPhoto=null;
+  openId=id;bindPhoto($('#ansPick'),b=>ansPhoto=b,ansPhoto,'Aggiungi una foto da lì');
 }
 
 let geoRes=[],spot=null,spotMarker=null;
@@ -995,6 +1109,7 @@ function openSpot(){
     ${pls.length?`<label>Posti nell'app qui intorno</label>${pls.map(p=>`<div class="row" data-act="place" data-id="${p.id}" style="cursor:pointer"><div><b>${esc(p.name)}</b><div class="meta">${esc(p.cat)}</div></div>${stHtml(p)}</div>`).join('')}`:''}
     <label>Conversazioni entro ${fmtD(R)} (${posts.length})</label>
     ${posts.length?posts.map(p=>postCard(p)).join(''):'<p class="empty">Ancora nessuna. Fai la prima domanda.</p>'}
+    <button class="sec" style="width:100%;margin-top:12px" data-act="zoneSpot">${ZONES.some(z=>dist(z,s)<300)?'Segui già questa zona ✓':'Segui questa zona'}</button>
     <div class="btns"><button class="sec" data-close>Chiudi</button><button class="pri" data-act="askSpot" data-v="">Chiedi a chi è lì</button></div>`,'spot');
 }
 
@@ -1027,12 +1142,38 @@ const actions={
   block:by=>{const n=user(by).n;if(!db.blocked.includes(by))db.blocked.push(by);save();closeModal();toast(n+' bloccato su questo telefono');reloadSoon()},
   del:async id=>{closeModal();await run(sb.from('posts').delete().eq('id',id),'Eliminata')},
   delA:async(id,v)=>{if(await run(sb.from('answers').delete().eq('id',v),'Risposta eliminata'))openThread(id)},
-  sendAns:async(id,_,btn)=>{const ta=$('#ansText'),t=ta.value.trim();if(!t)return;if(btn){btn.disabled=true;btn.textContent='Invio…'}
-    const ok=await run(sb.rpc('add_answer',{p_post_id:id,p_body:t,p_lat:me?me.lat:null,p_lng:me?me.lng:null}),'Risposta salvata: +10 punti');
-    if(ok){ta.value='';openThread(id)}else if(btn){btn.disabled=false;btn.textContent='Invia risposta'}},
+  sendAns:async(id,_,btn)=>{const ta=$('#ansText'),t=ta.value.trim();if(!t){toast('Scrivi la risposta (la foto è in più)');return}if(btn){btn.disabled=true;btn.textContent=ansPhoto?'Carico la foto…':'Invio…'}
+    let url=null;if(ansPhoto){url=await uploadPhoto(ansPhoto);if(!url){if(btn){btn.disabled=false;btn.textContent='Invia risposta'}return}}
+    const ok=await run(sb.rpc('add_answer',{p_post_id:id,p_body:t,p_lat:me?me.lat:null,p_lng:me?me.lng:null,p_photo_url:url}),'Risposta salvata: +10 punti');
+    if(ok){ta.value='';ansPhoto=null;openThread(id)}else if(btn){btn.disabled=false;btn.textContent='Invia risposta'}},
   logout:async()=>{await sb.auth.signOut();location.replace(APP_URL)},
-  join:id=>{const g=db.groups.find(x=>x.id===id);g.joined=!g.joined;save();toast(g.joined?'Ti sei unito a '+g.name:'Sei uscito dal gruppo');openGroup(id);render()},
-  gPost:id=>{const t=$('#gText').value.trim();if(!t)return;const g=db.groups.find(x=>x.id===id);g.posts.push({id:uid(),by:'me',text:t,t:now(),replies:0});save();openGroup(id)},
+  gNew:()=>openNewGroup(),
+  gTopic:id=>openGPost(id),
+  gJoin:async id=>{const g=GROUPS.find(x=>x.id===id);if(await run(sb.from('group_members').insert({group_id:id,user_id:myId}),'Ti sei unito a '+(g?g.name:'il gruppo')))(modalKind==='gpost'&&openId?openGPost(openId):openGroup(id))},
+  gLeave:async id=>{if(await run(sb.from('group_members').delete().eq('group_id',id).eq('user_id',myId),'Sei uscito dal gruppo'))openGroup(id)},
+  gRemove:id=>{const g=GROUPS.find(x=>x.id===id);openModal(`<h3>Eliminare “${esc(g?g.name:'')}”?</h3><p class="meta">Spariscono il gruppo e tutte le discussioni, per tutti. Non si può annullare.</p>
+    <div class="btns"><button class="sec" data-act="group" data-id="${id}">Annulla</button><button class="pri" style="background:var(--alert)" data-act="gRemoveOk" data-id="${id}">Elimina</button></div>`,'gdel')},
+  gRemoveOk:async id=>{closeModal();await run(sb.from('groups').delete().eq('id',id),'Gruppo eliminato')},
+  gShare:async id=>{const g=GROUPS.find(x=>x.id===id);if(!g)return;const url=APP_URL+'#group='+id,text='Gruppo “'+g.name+'” su App Locale';
+    try{if(navigator.share){await navigator.share({title:'App Locale',text,url});return}
+      await navigator.clipboard.writeText(text+'\n'+url);toast('Link copiato: incollalo dove vuoi')}catch(e){if(e&&e.name!=='AbortError')toast('Non riesco a condividere da qui')}},
+  gPost:async(id,_,btn)=>{const t=$('#gText').value.trim();if(!t){toast('Scrivi qualcosa (la foto è in più)');return}btn.disabled=true;btn.textContent=gPhoto?'Carico la foto…':'Pubblico…';
+    let url=null;if(gPhoto){url=await uploadPhoto(gPhoto);if(!url){btn.disabled=false;btn.textContent='Pubblica';return}}
+    if(await run(sb.from('group_posts').insert({group_id:id,author_id:myId,body:t,photo_url:url}),'Pubblicato ✓')){$('#gText').value='';gPhoto=null;openGroup(id)}else{btn.disabled=false;btn.textContent='Pubblica'}},
+  gReply:async(id,_,btn)=>{const x=GPOSTS.find(y=>y.id===id);if(!x)return;const t=$('#gText').value.trim();if(!t){toast('Scrivi la risposta');return}btn.disabled=true;btn.textContent=gPhoto?'Carico la foto…':'Invio…';
+    let url=null;if(gPhoto){url=await uploadPhoto(gPhoto);if(!url){btn.disabled=false;btn.textContent='Rispondi';return}}
+    if(await run(sb.from('group_posts').insert({group_id:x.group_id,parent_id:id,author_id:myId,body:t,photo_url:url}),'Risposta inviata ✓')){$('#gText').value='';gPhoto=null;openGPost(id)}else{btn.disabled=false;btn.textContent='Rispondi'}},
+  gDel:async id=>{const x=GPOSTS.find(y=>y.id===id);if(!x)return;if(await run(sb.from('group_posts').delete().eq('id',id),'Eliminato'))(x.parent_id?openGPost(x.parent_id):openGroup(x.group_id))},
+  alertToggle:async()=>{const on=!wantAlerts();
+    if(await run(sb.from('profiles').update({alerts_nearby:on}).eq('id',myId),on?'Avvisi da chi è vicino attivi':'Avvisi da chi è vicino spenti')){
+      if(on){lastAlert=null;maybeAlert(true)}else sb.rpc('clear_alert_position').then(()=>{})}},
+  alertRad:async v=>{await run(sb.from('profiles').update({alert_radius_m:+v}).eq('id',myId),'Ti avvisiamo entro '+fmtD(+v))},
+  zoneNew:()=>{if(!me){toast('Non so ancora dove sei: consenti la posizione o cerca un posto');return}
+    const n=(placeLabel||'').split(' · ').pop();openZoneNew({name:n&&n!=='Posizione attuale'?n:'Casa',lat:me.lat,lng:me.lng,where:placeLabel})},
+  zoneSpot:()=>{if(!spot)return;if(ZONES.some(z=>dist(z,spot)<300)){toast('Segui già questa zona');return}
+    openZoneNew({name:spot.name,lat:spot.lat,lng:spot.lng,where:short(spot.addr)||spot.name,big:AREA.includes(spot.type)})},
+  zoneDel:async id=>{const z=ZONES.find(x=>x.id===id);await run(sb.from('followed_zones').delete().eq('id',id),'Non segui più '+(z?z.name:'la zona'))},
+  zoneShow:id=>{const z=ZONES.find(x=>x.id===id);if(!z)return;setTab('map');map.fitBounds(L.latLng(z.lat,z.lng).toBounds(z.radius_m*2))},
   rfAdd:async id=>{await run(sb.from('friendships').insert({requester_id:myId,addressee_id:id}),'Richiesta inviata a '+user(id).n)},
   rfAccept:async id=>{const f=FR.find(x=>String(x.id)===String(id));
     await run(sb.from('friendships').update({status:'accepted',responded_at:iso(now())}).eq('id',id),f?'Ora tu e '+user(f.other).n+' siete amici':'Amicizia accettata')},
