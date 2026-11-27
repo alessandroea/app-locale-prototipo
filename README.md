@@ -2,7 +2,21 @@
 
 Prototipo web dell'app basata sulla posizione di Alessandro e Giovanni.
 
-**Ultima: V10**
+**Ultima: V11**
+- Mappa nuova (MapLibre + OpenFreeMap, gratis e senza chiave): vista 3D con edifici in rilievo, stile scuro di notte, pin che "respirano" e si spengono man mano che invecchiano. Pulsante Livelli (icona a strati) per 3D, traffico, webcam, riavvolgi e modalità prova.
+- Perché?: da un posto, una ricerca o una conversazione, l'app raccoglie da sola i possibili motivi: incidenti e code (TomTom), scioperi dei trasporti in Italia (dati del Ministero ripubblicati da onData), metro di Londra (TfL), meteo adesso (Open-Meteo), la webcam più vicina (Windy) e cosa dice la community.
+- Traffico dal vivo sulla mappa (TomTom) e webcam pubbliche (Windy) come livelli da accendere.
+- Riavvolgi 24 ore: slider e riproduzione per rivedere cosa è successo in zona.
+- SOS: nuovo tipo per animali smarriti, oggetti persi e richieste di aiuto (avvisa entro 5 km per 48 ore) con volantino A4 con QR da stampare o condividere.
+
+**Per accendere traffico e webcam (una volta sola):** crea le chiavi gratuite su https://developer.tomtom.com e https://api.windy.com/keys, poi in Supabase → SQL Editor esegui:
+```sql
+select vault.create_secret('CHIAVE_TOMTOM', 'tomtom_key');
+select vault.create_secret('CHIAVE_WINDY', 'windy_key');
+```
+Le chiavi restano nel database: le usa solo la funzione `servizi` e non finiscono nel codice pubblico.
+
+V10:
 - Avvisi a chi è in zona: quando arriva una domanda o notizia, la notifica va a chi è vicino (entro il raggio scelto da chi chiede e da chi riceve), a chi segue quella zona e agli amici; non più a tutti. Il database tiene solo la zona di ognuno (~100 m) in una tabella che nessuno può leggere; si spegne da Profilo → Notifiche.
 - Foto nelle risposte: chi è sul posto risponde con la prova.
 - Zone seguite (fino a 10): casa, lavoro, il tuo paese; dal Profilo o dalla ricerca ("Segui questa zona"). Cerchi tratteggiati sulla mappa e filtro "Le mie zone" nel feed.
@@ -34,7 +48,7 @@ V06:
 V05: ricerca dei posti nel mondo, amicizie, avvisi e notifiche push (su iPhone: Condividi → "Aggiungi alla schermata Home", poi Profilo → Notifiche sul telefono → Attiva).
 
 Prova: https://alessandroea.github.io/app-locale-prototipo/
-Versioni precedenti: [/v09/](https://alessandroea.github.io/app-locale-prototipo/v09/) · [/v08/](https://alessandroea.github.io/app-locale-prototipo/v08/) · [/v07/](https://alessandroea.github.io/app-locale-prototipo/v07/) · [/v06/](https://alessandroea.github.io/app-locale-prototipo/v06/) · [/v05/](https://alessandroea.github.io/app-locale-prototipo/v05/) · [/v04/](https://alessandroea.github.io/app-locale-prototipo/v04/) · [/v03/](https://alessandroea.github.io/app-locale-prototipo/v03/)
+Versioni precedenti: [/v10/](https://alessandroea.github.io/app-locale-prototipo/v10/) · [/v09/](https://alessandroea.github.io/app-locale-prototipo/v09/) · [/v08/](https://alessandroea.github.io/app-locale-prototipo/v08/) · [/v07/](https://alessandroea.github.io/app-locale-prototipo/v07/) · [/v06/](https://alessandroea.github.io/app-locale-prototipo/v06/) · [/v05/](https://alessandroea.github.io/app-locale-prototipo/v05/) · [/v04/](https://alessandroea.github.io/app-locale-prototipo/v04/) · [/v03/](https://alessandroea.github.io/app-locale-prototipo/v03/)
 
 ## Database (Supabase)
 
@@ -49,6 +63,7 @@ Versioni precedenti: [/v09/](https://alessandroea.github.io/app-locale-prototipo
 - `supabase/08_v09_posizione_default.sql`: posizione per gli amici accesa di default, spegnibile dal profilo.
 - `supabase/09_v09_foto_post.sql`: foto nelle domande e notizie (bucket `post-photos`).
 - `supabase/10_v10_zone_gruppi.sql`: avvisi a chi è in zona, zone seguite, foto nelle risposte, gruppi.
+- `supabase/functions/servizi/index.ts` (V11): ponte verso TomTom, Windy, Open-Meteo, scioperi MIT/onData e TfL per "Perché?", traffico e webcam.
 - `supabase/functions/send-push`: funzione che manda le notifiche push; le chiavi VAPID sono nel Vault di Supabase.
 - Possono entrare solo le email nella tabella `members`. Per aggiungere una persona:
   `insert into public.members (email, name, color) values ('email@esempio.com', 'Nome', '#8e4ec6');`

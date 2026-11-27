@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#F3F5F9" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0C1424" media="(prefers-color-scheme: dark)">
-<title>App Locale – V10</title>
+<title>App Locale – V11</title>
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-v6-180.png">
 <link rel="icon" type="image/png" href="icon-v6-192.png">
@@ -16,7 +16,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,650;12..96,800&display=swap">
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.24.1/dist/maplibre-gl.css">
 <style>
 /* V08 prototipo – App Locale (Alessandro & Giovanni). V09: posizione per gli amici attiva di default, si spegne dal Profilo.
    Nuova grafica: mappa a tutto schermo, pin "a segnale" colorati per urgenza, tema chiaro/scuro,
@@ -37,8 +37,6 @@
   --shadow:0 18px 40px -18px rgba(0,0,0,.8),0 2px 8px -2px rgba(0,0,0,.5);
   color-scheme:dark;
 }
-  .leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) brightness(.92) contrast(.88) saturate(.7)}
-  .leaflet-container{background:#0c1424}
 }
 *{box-sizing:border-box;min-width:0}
 html,body{height:100%;margin:0}
@@ -195,7 +193,31 @@ label{display:block;font-size:13px;font-weight:600;color:var(--mute);margin:16px
 .pl i{width:10px;height:10px;border-radius:50%;background:#9aa4af}
 .pl b{background:var(--cobalt);color:var(--on-cobalt);border-radius:99px;padding:2px 7px;font-size:11px}
 .spot-pin{width:38px;height:38px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:var(--ink);border:3px solid #fff;box-shadow:0 3px 10px rgba(0,0,0,.35)}
-.leaflet-control-attribution{font-size:10px}
+.maplibregl-ctrl-attrib{font-size:10px}
+.maplibregl-ctrl-bottom-right{bottom:calc(var(--tab) + env(safe-area-inset-bottom) + 6px)}
+.mk{position:relative;overflow:visible;cursor:pointer}
+/* V11 */
+.q-pin.sos{font-size:11px;letter-spacing:-.02em}
+.q-pin.glow::before{content:"";position:absolute;inset:-14px;border-radius:50%;background:radial-gradient(circle,color-mix(in srgb,var(--c) 45%,transparent),transparent 70%);z-index:-1;animation:breathe 2.8s ease-in-out infinite}
+@keyframes breathe{50%{transform:scale(1.35);opacity:.55}}
+@media (prefers-reduced-motion:reduce){.q-pin.glow::before{animation:none}}
+.cam-pin{width:34px;height:34px;border-radius:10px;background:#0F1B33;border:2px solid #fff;display:grid;place-items:center;box-shadow:0 3px 10px rgba(0,0,0,.4);overflow:hidden}
+.cam-pin img{width:100%;height:100%;object-fit:cover;opacity:.9}
+.cam-pin::after{content:"";position:absolute;right:-3px;top:-3px;width:10px;height:10px;border-radius:50%;background:#E5484D;border:2px solid #fff}
+.camimg{display:block;width:100%;border-radius:14px;background:var(--surface2);aspect-ratio:16/9;object-fit:cover;margin:10px 0 6px}
+.layers .row{cursor:pointer}
+.replay{position:fixed;z-index:12;left:calc(var(--rail) + 12px);right:12px;top:calc(env(safe-area-inset-top) + 118px);background:var(--surface);border-radius:16px;box-shadow:var(--shadow);padding:10px 12px;display:flex;align-items:center;gap:10px}
+.replay input{flex:1;accent-color:var(--cobalt)}
+.replay b{font-size:13px;min-width:92px;text-align:center}
+.replay button{min-height:36px;padding:0 12px;font-size:13px}
+.why h4{margin:16px 0 6px;font:700 14px/1.2 var(--display)}
+.why .item{background:var(--surface2);border-radius:12px;padding:10px 12px;margin-bottom:6px}
+.why .item b{display:block}
+.why .hint{background:color-mix(in srgb,var(--cobalt) 12%,transparent);border-radius:14px;padding:12px;margin-top:10px}
+.why .hot{background:color-mix(in srgb,var(--alert) 14%,transparent)}
+.skel{height:14px;border-radius:7px;background:var(--surface2);margin:10px 0;animation:breathe 1.4s ease-in-out infinite}
+.sosbtn{width:100%;background:var(--alert)!important;color:#fff!important;margin-top:10px}
+.poster{display:block;width:100%;border-radius:12px;box-shadow:var(--shadow);margin:10px 0}
 @keyframes ping{0%{transform:scale(1);opacity:.75}100%{transform:scale(2.1);opacity:0}}
 @keyframes up{from{transform:translateY(24px);opacity:.6}to{transform:none;opacity:1}}
 
@@ -292,10 +314,12 @@ label{display:block;font-size:13px;font-weight:600;color:var(--mute);margin:16px
   <div class="top">
     <button class="searchbar" data-act="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg><span>Cerca un posto</span></button>
     <button class="round" data-act="locate" aria-label="Centra sulla mia posizione"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 3 3 10.5l7.5 2.6L13 21z"/></svg></button>
-    <button class="round" id="btnSim" data-act="sim" aria-label="Modalità prova: tocca la mappa per spostarti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/><circle cx="12" cy="12" r="5"/></svg></button>
+    <button class="round" data-act="layers" aria-label="Livelli della mappa: 3D, traffico, webcam, riavvolgi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="m12 3 9 5-9 5-9-5z"/><path d="m3 13 9 5 9-5"/></svg></button>
+    <button class="round hide" id="btnSim" data-act="sim" aria-label="Modalità prova: tocca la mappa per spostarti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/><circle cx="12" cy="12" r="5"/></svg></button>
     <button class="topav" data-tab="me" id="topAv" aria-label="Il tuo profilo"></button>
   </div>
   <div class="mapf" id="mapF" role="group" aria-label="Cosa mostrare sulla mappa"><button class="chip on" data-act="mapF" data-id="all">Tutto</button><button class="chip" data-act="mapF" data-id="urgent">Urgenti</button><button class="chip" data-act="mapF" data-id="friends">Amici</button></div>
+  <div class="replay hide" id="replay"><button class="sec" id="rpPlay" aria-label="Riproduci le ultime 24 ore">▶</button><input type="range" id="rpRange" min="-1440" max="0" step="10" value="0" aria-label="Riavvolgi la mappa"><b id="rpLbl">Adesso</b><button class="sec" id="rpClose">Chiudi</button></div>
   <div class="sim hide" id="simBadge">Modalità prova: tocca la mappa per spostarti</div>
   <section class="sheet" id="sheet" aria-label="Intorno a te">
     <button class="grab" data-act="sheet" aria-label="Riduci o espandi il pannello"></button>
@@ -369,11 +393,11 @@ label{display:block;font-size:13px;font-weight:600;color:var(--mute);margin:16px
       <button class="sec big" id="aOut" type="button">Esci</button>
     </div>
     <p class="amsg" id="aMsg" role="status"></p>
-    <p class="demo">Prototipo V10</p>
+    <p class="demo">Prototipo V11</p>
   </div>
 </div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/maplibre-gl@5.24.1/dist/maplibre-gl.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 {
@@ -401,9 +425,9 @@ const U={
 };
 const REP={tranquillo:{l:'Tranquillo',c:'#30a46c'},affollato:{l:'Affollato',c:'#f76b15'},coda:{l:'Coda',c:'#e5484d'},
   evento:{l:'Evento',c:'#8e4ec6'},ritardi:{l:'Ritardi',c:'#e5484d'},chiuso:{l:'Chiuso',c:'#6b7785'}};
-const CATS={emergenza:'Emergenza',traffico:'Traffico',trasporti:'Trasporti',info:'Servizi e info',eventi:'Eventi',natura:'Natura',sport:'Sport',cibo:'Cibo'};
+const CATS={smarrito:'SOS e smarriti',emergenza:'Emergenza',traffico:'Traffico',trasporti:'Trasporti',info:'Servizi e info',eventi:'Eventi',natura:'Natura',sport:'Sport',cibo:'Cibo'};
 /* urgenza (dal documento di Giovanni): rosso emergenza, giallo viabilità e servizi, verde vita locale */
-const URG={emergenza:'alert',traffico:'warn',trasporti:'warn',info:'warn',eventi:'calm',natura:'calm',sport:'calm',cibo:'calm'};
+const URG={smarrito:'alert',emergenza:'alert',traffico:'warn',trasporti:'warn',info:'warn',eventi:'calm',natura:'calm',sport:'calm',cibo:'calm'};
 const URG_L={alert:'Urgente',warn:'Viabilità e servizi',calm:'Vita locale'};
 const urgOf=p=>URG[p.cat]||'warn';
 
@@ -450,7 +474,7 @@ save();
 const iso=ms=>new Date(ms).toISOString();
 async function load(){
   $('#loading').classList.remove('hide');
-  const since=iso(now()-6*H);
+  const since=iso(now()-24*H);
   const [pl,rp,po,an,vo,pr,fr,nt,rx,lc,gr,gm,gp,zn]=await Promise.all([
     sb.from('places').select('id,name,category,lat,lng,info'),
     sb.from('place_reports').select('place_id,status,is_demo,demo_offset_min,created_at').or(`is_demo.eq.true,created_at.gt.${since}`),
@@ -616,6 +640,96 @@ async function fitJpeg(file,max=1280){
   c.width=Math.round(img.naturalWidth*k);c.height=Math.round(img.naturalHeight*k);c.getContext('2d').drawImage(img,0,0,c.width,c.height);
   URL.revokeObjectURL(img.src);return new Promise(ok=>c.toBlob(ok,'image/jpeg',.82));
 }
+function openLayers(){
+  const row=(k,on,t,m)=>`<div class="row" data-act="layer" data-id="${k}"><div><b>${t}</b><div class="meta">${m}</div></div><button class="sw ${on?'on':''}" role="switch" aria-checked="${!!on}" aria-label="${t}" tabindex="-1"></button></div>`;
+  openModal(`<h3>Mappa</h3><div class="box2 layers">
+    ${row('d3',PREF.d3,'Vista 3D','Mappa inclinata con gli edifici in rilievo. Con due dita giri e inclini la mappa.')}
+    ${row('traffic',PREF.traffic,'Traffico dal vivo','Strade colorate: verde scorre, rosso coda. Aggiornato ogni minuto (TomTom).')}
+    ${row('cams',PREF.cams,'Webcam','Immagini delle webcam pubbliche nella zona che stai guardando (Windy).')}
+    ${row('sim',simMode,'Modalità prova','Sposta la tua posizione toccando la mappa, per provare l\'app da un altro posto.')}
+    <div class="row" data-act="layer" data-id="replay"><div><b>Riavvolgi 24 ore</b><div class="meta">Rivedi cosa è successo in zona: domande e notizie compaiono e si spengono nel tempo.</div></div><span class="meta">›</span></div>
+    </div><div class="btns"><button class="pri" data-close>Fatto</button></div>`,'layers');
+}
+/* ---------- Perché? Possibili motivi in un posto (traffico, scioperi, meteo, metro di Londra, webcam, community) ---------- */
+let WHYCAMS=[];
+async function openWhy(lat,lng,label){
+  openModal(`<div class="why"><span class="tag cat">Perché?</span><h3>${esc(label||'Questo posto')}</h3><div class="meta">Cerco i possibili motivi qui intorno…</div>
+    <div class="skel"></div><div class="skel" style="width:80%"></div><div class="skel" style="width:60%"></div></div>`,'why');
+  const key=lat.toFixed(4)+','+lng.toFixed(4);openId=key;
+  let geo={};try{const r=await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=10&accept-language=it`);geo=(await r.json()).address||{}}catch(e){}
+  const cc=(geo.country_code||'').toLowerCase(),region=geo.state||'',prov=(geo.province||geo.county||'').replace(/^(Provincia|Città metropolitana) di /i,'');
+  let d={};try{const r=await fetch(`${SB_URL}/functions/v1/servizi?a=perche&lat=${lat.toFixed(4)}&lng=${lng.toFixed(4)}&cc=${cc}&region=${encodeURIComponent(region)}&prov=${encodeURIComponent(prov)}`,{headers:{Authorization:'Bearer '+jwt,apikey:SB_KEY}});d=await r.json()}catch(e){d={errore:true}}
+  if(modalKind!=='why'||openId!==key)return;
+  const here={lat,lng},posts=alive().filter(p=>dist(p,here)<=2000).sort((a,b)=>b.t-a.t);
+  const inc=(d.traffico&&d.traffico.incidenti)||[],sc=d.scioperi||[],tf=d.tfl||[],mt=d.meteo,cams=(d.webcam&&d.webcam.webcams)||[];WHYCAMS=cams;
+  const motivi=[];
+  inc.filter(i=>i.gravita>=2||i.ritardo_s>=300||/chius|incident/i.test(i.tipo)).slice(0,2).forEach(i=>motivi.push(`${esc(i.tipo)}${i.strada?' su '+esc(i.strada):''}${i.d<5000?' a '+fmtD(i.d):''}${i.ritardo_s>=60?', '+Math.round(i.ritardo_s/60)+' min di ritardo':''}`));
+  sc.filter(x=>x.oggi&&x.qui>=2).slice(0,2).forEach(x=>motivi.push(`Sciopero oggi: ${esc(x.settore.toLowerCase())}, ${esc(x.zona)}`));
+  if(!sc.some(x=>x.oggi&&x.qui>=2))sc.filter(x=>x.oggi&&/ferrov|trasporto pubblico|marittimo|aereo|generale/i.test(x.settore)).slice(0,1).forEach(x=>motivi.push(`Sciopero nazionale oggi: ${esc(x.settore.toLowerCase())}`));
+  if(mt&&mt.forte)motivi.push(`Meteo: ${esc(mt.cielo.toLowerCase())}, raffiche fino a ${mt.raffiche} km/h`);
+  tf.filter(x=>/suspend|closure|severe/i.test(x.stato)).slice(0,2).forEach(x=>motivi.push(`${esc(x.linea)}: ${esc(x.stato)}`));
+  if(posts[0])motivi.push(`Nell'app: “${esc(posts[0].text.slice(0,70))}${posts[0].text.length>70?'…':''}” (${ago(posts[0].t)})`);
+  const off=t=>`<div class="item"><span class="meta">${t}</span></div>`;
+  openModal(`<div class="why"><span class="tag cat">Perché?</span><h3>${esc(label||'Questo posto')}</h3>
+    <div class="meta">Aggiornato alle ${new Date().toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'})}${geo.city||geo.town||geo.village?' · '+esc(geo.city||geo.town||geo.village):''}</div>
+    <div class="hint ${motivi.length?'hot':''}"><b>${motivi.length?'Possibili motivi':'Nessun motivo ufficiale trovato'}</b>
+      ${motivi.length?motivi.map(m=>`<div style="margin-top:6px">• ${m}</div>`).join(''):'<div class="meta" style="margin-top:4px">Le fonti ufficiali non segnalano niente di strano: chiedilo a chi è lì, risponde chi è in zona.</div>'}</div>
+    ${cams.length?`<h4>Guarda adesso</h4><img class="camimg" src="${esc(cams[0].img)}" alt="Webcam" data-act="camWhy" data-id="${cams[0].id}"><div class="meta">${esc(cams[0].title||'')} · a ${fmtD(cams[0].d)} · <a href="${esc(cams[0].url)}" target="_blank" rel="noopener">Windy.com</a>${cams.length>1?` · <a href="#" data-act="camsHere" data-v="${lat},${lng}">altre ${cams.length-1} sulla mappa</a>`:''}</div>`:''}
+    <h4>Traffico e strade</h4>${d.traffico&&d.traffico.attiva===false?off('Da attivare: serve la chiave gratuita di TomTom (Profilo → Servizi della mappa).'):inc.length?inc.map(i=>`<div class="item"><b>${esc(i.tipo)}${i.strada?' · '+esc(i.strada):''}</b><span class="meta">${i.testo?esc(i.testo)+'. ':''}${i.da?esc(i.da)+(i.a?' → '+esc(i.a):'')+'. ':''}${i.ritardo_s>=60?Math.round(i.ritardo_s/60)+' min di ritardo · ':''}a ${fmtD(i.d)}</span></div>`).join(''):d.traffico?off('Nessun incidente o coda segnalati entro 4–5 km.'):off('Non disponibile adesso.')}
+    ${cc==='it'?`<h4>Scioperi dei trasporti (oggi e prossimi 2 giorni)</h4>${sc.length?sc.map(x=>`<div class="item"><b>${x.oggi?'Oggi':esc(x.quando)} · ${esc(x.settore)}${x.qui>=2?' · in zona':''}</b><span class="meta">${esc(x.chi)}. ${esc(x.modalita||'')}${x.zona&&x.zona!=='Italia'?' ('+esc(x.zona)+')':''}</span></div>`).join(''):off('Nessuno sciopero dei trasporti in programma qui.')}`:''}
+    ${tf.length?`<h4>Metro e treni di Londra</h4>${tf.map(x=>`<div class="item"><b>${esc(x.linea)} · ${esc(x.stato)}</b>${x.motivo?`<span class="meta">${esc(x.motivo)}</span>`:''}</div>`).join('')}`:d.tfl?`<h4>Metro e treni di Londra</h4>${off('Servizio regolare su tutte le linee.')}`:''}
+    ${mt?`<h4>Meteo adesso</h4><div class="item ${mt.forte?'hot':''}"><b>${esc(mt.cielo)}, ${mt.temp}°</b><span class="meta">Vento ${mt.vento} km/h, raffiche ${mt.raffiche} km/h${mt.pioggia_mm?' · pioggia '+mt.pioggia_mm+' mm':''}</span></div>`:''}
+    <h4>Dalla community (entro 2 km)</h4>${posts.length?posts.slice(0,3).map(p=>postCard(p)).join(''):off('Ancora nessuna domanda o notizia qui.')}
+    <p class="meta" style="margin-top:12px">Fonti: TomTom, Windy, Open-Meteo, Ministero dei Trasporti (dati aperti di onData), TfL. Possono non essere aggiornate al minuto.</p>
+    <div class="btns"><button class="sec" data-close>Chiudi</button><button class="pri" data-act="whyAsk" data-v="${lat},${lng}" data-id="${esc(label||'')}">Chiedi a chi è lì</button></div></div>`,'why');
+  openId=key;
+}
+/* ---------- volantino con QR per SOS e smarriti ---------- */
+function loadScript(src){return new Promise((ok,ko)=>{if(document.querySelector(`script[src="${src}"]`))return ok();const sc=document.createElement('script');sc.src=src;sc.onload=ok;sc.onerror=ko;document.head.appendChild(sc)})}
+function wrapText(ctx,text,maxW){const words=text.split(/\s+/),lines=[];let line='';
+  words.forEach(w=>{const t=line?line+' '+w:w;if(ctx.measureText(t).width>maxW&&line){lines.push(line);line=w}else line=t});if(line)lines.push(line);return lines}
+async function makePoster(p){
+  await loadScript('https://cdn.jsdelivr.net/npm/qrcode-generator@1.5.2/qrcode.js');
+  const W=1240,H=1754,c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d');
+  const sos=p.cat==='smarrito',red='#E5484D',ink='#0F1B33',font='"Bricolage Grotesque",-apple-system,system-ui,sans-serif';
+  x.fillStyle='#fff';x.fillRect(0,0,W,H);
+  x.fillStyle=sos?red:'#2f6fe4';x.fillRect(0,0,W,250);
+  x.fillStyle='#fff';x.font=`800 120px ${font}`;x.textBaseline='middle';x.fillText(sos?'SOS':(p.type==='n'?'AVVISO':'AIUTO'),70,125);
+  x.font=`600 40px ${font}`;x.textAlign='right';x.fillText(new Date(p.t).toLocaleString('it-IT',{day:'numeric',month:'long',hour:'2-digit',minute:'2-digit'}),W-70,95);
+  x.fillText(p.place.split(' · ')[0].slice(0,34),W-70,160);x.textAlign='left';
+  let y=300;
+  if(p.photo){try{const img=await new Promise((ok,ko)=>{const i=new Image();i.crossOrigin='anonymous';i.onload=()=>ok(i);i.onerror=ko;i.src=p.photo});
+    const bw=W-140,bh=660,k=Math.max(bw/img.width,bh/img.height),sw=bw/k,sh=bh/k;
+    x.save();x.beginPath();x.roundRect?x.roundRect(70,y,bw,bh,28):x.rect(70,y,bw,bh);x.clip();x.drawImage(img,(img.width-sw)/2,(img.height-sh)/2,sw,sh,70,y,bw,bh);x.restore();y+=700}catch(e){}}
+  x.fillStyle=ink;x.font=`700 ${p.photo?54:72}px ${font}`;x.textBaseline='top';
+  wrapText(x,p.text,W-140).slice(0,p.photo?5:8).forEach(l=>{x.fillText(l,70,y);y+=p.photo?66:88});
+  const qr=qrcode(0,'M');qr.addData(APP_URL+'#post='+p.id);qr.make();
+  const n=qr.getModuleCount(),cell=Math.floor(380/n),qx=90,qy=H-cell*n-140;
+  x.fillStyle='#fff';x.fillRect(qx-20,qy-20,cell*n+40,cell*n+40);x.fillStyle=ink;
+  for(let r=0;r<n;r++)for(let col=0;col<n;col++)if(qr.isDark(r,col))x.fillRect(qx+col*cell,qy+r*cell,cell,cell);
+  x.font=`700 46px ${font}`;const tx=qx+cell*n+60;
+  wrapText(x,sos?'Lo hai visto? Scansiona il codice e scrivi dove':'Scansiona il codice per aggiornamenti e risposte',W-tx-70).forEach((l,i)=>x.fillText(l,tx,qy+10+i*58));
+  x.font=`500 34px ${font}`;x.fillStyle='#5b6478';x.fillText('Si apre App Locale su questa segnalazione.',tx,qy+230);
+  x.fillText('Chi è in zona riceve un avviso.',tx,qy+276);
+  x.fillStyle=sos?red:'#2f6fe4';x.fillRect(0,H-60,W,60);x.fillStyle='#fff';x.font=`700 30px ${font}`;x.textBaseline='middle';x.fillText('App Locale · chi è lì risponde',70,H-30);
+  return c;
+}
+async function openPoster(id){
+  const p=db.posts.find(x=>x.id===id);if(!p)return;
+  openModal(`<h3>Volantino con QR</h3><p class="meta">Preparo il volantino…</p><div class="skel" style="height:320px"></div>`,'poster');openId=id;
+  let c;try{c=await makePoster(p)}catch(e){toast('Non riesco a creare il volantino adesso');closeModal();return}
+  if(modalKind!=='poster'||openId!==id)return;
+  const url=c.toDataURL('image/png');
+  openModal(`<h3>Volantino con QR</h3><p class="meta">Stampalo o condividilo su WhatsApp: chi scansiona il codice arriva su questa segnalazione e può rispondere.</p>
+    <img class="poster" src="${url}" alt="Anteprima del volantino">
+    <div class="btns"><button class="sec" data-act="thread" data-id="${p.id}">Indietro</button><button class="pri" id="posterShare">Condividi o salva</button></div>
+    <button class="sec" style="width:100%;margin-top:8px" id="posterPrint">Stampa</button>`,'poster');openId=id;
+  $('#posterShare').onclick=async()=>{try{const blob=await new Promise(ok=>c.toBlob(ok,'image/png')),file=new File([blob],'volantino-app-locale.png',{type:'image/png'});
+      if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:'App Locale',text:p.text.slice(0,100)});return}
+      const a=document.createElement('a');a.href=url;a.download='volantino-app-locale.png';document.body.appendChild(a);a.click();a.remove();toast('Volantino scaricato')}catch(e){if(e&&e.name!=='AbortError')toast('Non riesco a condividere da qui')}};
+  $('#posterPrint').onclick=()=>{const w=window.open('');if(!w){toast('Consenti le finestre per stampare');return}
+    w.document.write(`<title>Volantino</title><style>@page{size:A4;margin:0}body{margin:0}img{width:100%}</style><img src="${url}" onload="setTimeout(()=>print(),200)">`);w.document.close()};
+}
 /* ---------- foto profilo: ritaglio quadrato 320 px, JPEG, nella cartella dell'utente ---------- */
 async function squareJpeg(file,size=320){
   const img=await new Promise((ok,ko)=>{const i=new Image();i.onload=()=>ok(i);i.onerror=ko;i.src=URL.createObjectURL(file)});
@@ -670,13 +784,113 @@ function status(pl){const r=pl.reports.filter(x=>now()-x.t<60*M);if(!r.length)re
 const stHtml=pl=>{const s=status(pl);return s?`<span class="st" style="color:${REP[s.type].c}"><i style="background:${REP[s.type].c}"></i>${REP[s.type].l}</span>`:'<span class="st" style="color:var(--mute)"><i style="background:#c3cad2"></i>Nessuna segnalazione</span>'};
 const myPoints=()=>{let p=0;db.posts.forEach(x=>{if(x.by==='me')p+=5+x.votes*2;x.answers.forEach(a=>{if(a.by==='me')p+=10+a.votes*2+(a.best?15:0)})});return p};
 
-/* ---------- mappa ---------- */
-const map=L.map('map',{zoomControl:false}).setView([51.4613,-0.3063],14);
-let tileErr=0,switched=false;
-const osm=L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'}).addTo(map);
-osm.on('tileerror',()=>{if(++tileErr>4&&!switched){switched=true;map.removeLayer(osm);
-  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'Tiles © Esri'}).addTo(map)}});
-const layer=L.layerGroup().addTo(map);
+/* ---------- mappa (V11: MapLibre + OpenFreeMap, edifici 3D, traffico, webcam) ----------
+   Piccolo strato "L" che imita le poche funzioni di Leaflet usate dall'app, così il resto del codice non cambia. */
+let jwt='';
+const PREF=(()=>{try{return JSON.parse(localStorage.getItem('applocale_map')||'{}')}catch(e){return{}}})();
+const savePref=()=>{try{localStorage.setItem('applocale_map',JSON.stringify(PREF))}catch(e){}};
+if(PREF.d3===undefined)PREF.d3=true;
+const darkQ=matchMedia('(prefers-color-scheme: dark)');
+const STYLE_URL=()=>'https://tiles.openfreemap.org/styles/'+(darkQ.matches?'dark':'liberty');
+const RASTER_STYLE={version:8,sources:{osm:{type:'raster',tiles:['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],tileSize:256,maxzoom:19,attribution:'© OpenStreetMap'}},layers:[{id:'osm',type:'raster',source:'osm'}]};
+const ml=new maplibregl.Map({container:'map',style:STYLE_URL(),center:[-0.3063,51.4613],zoom:13,pitch:PREF.d3?50:0,maxPitch:70,
+  attributionControl:{compact:true},
+  transformRequest:url=>url.startsWith(SB_URL+'/functions/v1/servizi')?{url,headers:{Authorization:'Bearer '+jwt,apikey:SB_KEY}}:{url}});
+let styleFails=0;
+ml.on('error',e=>{const m=String(e&&e.error&&e.error.message||'');
+  if(!ml.isStyleLoaded()&&++styleFails===1&&/style|Failed to fetch|NetworkError/i.test(m)){ml.setStyle(RASTER_STYLE)}});
+darkQ.addEventListener('change',()=>ml.setStyle(STYLE_URL()));
+const ZL=z=>z-1; // zoom "Leaflet" (tessere 256) → zoom MapLibre (512)
+const CIRC=new Map();let circId=0,circDirty=false;
+function circlePoly(lat,lng,r){const pts=[],R=6371e3,la=lat*Math.PI/180,lo=lng*Math.PI/180,d=r/R;
+  for(let i=0;i<=48;i++){const b=i/48*2*Math.PI,la2=Math.asin(Math.sin(la)*Math.cos(d)+Math.cos(la)*Math.sin(d)*Math.cos(b)),
+    lo2=lo+Math.atan2(Math.sin(b)*Math.sin(d)*Math.cos(la),Math.cos(d)-Math.sin(la)*Math.sin(la2));pts.push([lo2*180/Math.PI,la2*180/Math.PI])}
+  return pts}
+function flushCircles(){circDirty=false;const src=ml.getSource('circles');if(!src)return;
+  src.setData({type:'FeatureCollection',features:[...CIRC.values()].map(c=>({type:'Feature',properties:{col:c.o.color||'#2f6fe4',fo:c.o.fill===false?0:(c.o.fillOpacity??.1),w:c.o.weight??1,dash:!!c.o.dashArray},geometry:{type:'Polygon',coordinates:[circlePoly(c.lat,c.lng,c.r)]}}))})}
+const markCircles=()=>{if(!circDirty){circDirty=true;requestAnimationFrame(flushCircles)}};
+function addOverlays(){ // dopo ogni cambio di stile
+  if(!ml.getSource('circles')){ml.addSource('circles',{type:'geojson',data:{type:'FeatureCollection',features:[]}});
+    ml.addLayer({id:'circ-fill',type:'fill',source:'circles',paint:{'fill-color':['get','col'],'fill-opacity':['get','fo']}});
+    ml.addLayer({id:'circ-line',type:'line',source:'circles',filter:['!',['get','dash']],paint:{'line-color':['get','col'],'line-width':['get','w'],'line-opacity':.8}});
+    ml.addLayer({id:'circ-dash',type:'line',source:'circles',filter:['get','dash'],paint:{'line-color':['get','col'],'line-width':['get','w'],'line-dasharray':[3,3]}})}
+  try{if(!ml.getLayer('b3d')&&ml.getSource('openmaptiles')){const dark=darkQ.matches;
+    ['building-3d','building'].forEach(id=>{if(ml.getLayer(id)&&ml.getLayer(id).type==='fill-extrusion')ml.setLayoutProperty(id,'visibility','none')});
+    ml.addLayer({id:'b3d',type:'fill-extrusion',source:'openmaptiles','source-layer':'building',minzoom:14,
+      paint:{'fill-extrusion-color':dark?'#24314f':'#e3dfd8','fill-extrusion-height':['coalesce',['get','render_height'],8],
+        'fill-extrusion-base':['coalesce',['get','render_min_height'],0],'fill-extrusion-opacity':dark?.85:.75}},'circ-fill')}}catch(e){}
+  setTraffic(PREF.traffic,true);flushCircles();
+}
+ml.on('style.load',addOverlays);
+window.__ml=ml; // utile per le prove dal browser
+const L={
+  divIcon:o=>o,
+  latLng:(lat,lng)=>({lat,lng,toBounds:m=>{const d=m/2/111320,e=d/Math.cos(lat*Math.PI/180);return[[lat-d,lng-e],[lat+d,lng+e]]}}),
+  layerGroup:()=>{const g={items:new Set(),addTo(){return g},add(x){g.items.add(x)},clearLayers(){g.items.forEach(x=>x._rm());g.items.clear()}};return g},
+  marker:(ll,o={})=>{const ic=o.icon||{html:''},sz=ic.iconSize||[0,0],an=ic.iconAnchor||[sz[0]/2,sz[1]/2];
+    const el=document.createElement('div');el.className='mk';el.style.width=sz[0]+'px';el.style.height=sz[1]+'px';el.innerHTML=ic.html;
+    const m=new maplibregl.Marker({element:el,anchor:'top-left',offset:[-an[0],-an[1]]}).setLngLat([ll[1],ll[0]]);
+    const w={on(ev,fn){if(ev==='click')el.addEventListener('click',e=>{e.stopPropagation();fn()});return w},
+      addTo(t){m.addTo(ml);el.parentElement&&(el.parentElement.style.zIndex=String(10+(o.zIndexOffset||0)));if(t&&t.add)t.add(w);return w},
+      setLatLng(x){m.setLngLat([x[1],x[0]]);return w},_rm(){m.remove()},remove(){m.remove()},el};return w},
+  circle:(ll,o={})=>{const id=++circId,c={lat:ll[0],lng:ll[1],r:o.radius||100,o};
+    const w={addTo(t){CIRC.set(id,c);markCircles();if(t&&t.add)t.add(w);return w},setLatLng(x){c.lat=x[0];c.lng=x[1];markCircles();return w},
+      setRadius(r){c.r=r;markCircles();return w},_rm(){CIRC.delete(id);markCircles()},remove(){w._rm()}};return w},
+};
+const map={
+  setView(ll,z,o){ml.jumpTo({center:[ll[1],ll[0]],...(z!=null?{zoom:ZL(z)}:{})});return map},
+  panBy(xy){ml.panBy(xy,{duration:0});return map},
+  panTo(ll){ml.easeTo({center:[ll[1],ll[0]]});return map},
+  fitBounds(b,o={}){ml.fitBounds([[b[0][1],b[0][0]],[b[1][1],b[1][0]]],{padding:40,maxZoom:o.maxZoom?ZL(o.maxZoom):17,duration:600});return map},
+  removeLayer(x){x&&x.remove&&x.remove();return map},
+  on(ev,fn){if(ev==='click')ml.on('click',e=>fn({latlng:{lat:e.lngLat.lat,lng:e.lngLat.lng}}));return map},
+};
+const layer=L.layerGroup().addTo(map),camLayer=L.layerGroup().addTo(map);
+function set3D(on){PREF.d3=on;savePref();ml.easeTo({pitch:on?50:0,duration:700})}
+/* traffico dal vivo (TomTom, tramite la funzione "servizi" che tiene la chiave sul server) */
+function setTraffic(on,quiet){PREF.traffic=!!on;savePref();
+  if(!ml.isStyleLoaded())return;
+  if(on&&!ml.getSource('traffic')){ml.addSource('traffic',{type:'raster',tileSize:256,maxzoom:18,attribution:'Traffico © TomTom',
+      tiles:[SB_URL+'/functions/v1/servizi?a=tile&z={z}&x={x}&y={y}']});
+    ml.addLayer({id:'traffic',type:'raster',source:'traffic',paint:{'raster-opacity':.85}},ml.getLayer('circ-fill')?'circ-fill':undefined)}
+  if(!on&&ml.getLayer('traffic')){ml.removeLayer('traffic');ml.removeSource('traffic')}
+  if(on&&!quiet)fetch(SB_URL+'/functions/v1/servizi?a=tile&z=10&x=511&y=340',{headers:{Authorization:'Bearer '+jwt,apikey:SB_KEY}})
+    .then(r=>{if(r.status===204)toast('Traffico da attivare: serve la chiave gratuita di TomTom (vedi Profilo → Servizi della mappa)')}).catch(()=>{});
+}
+/* webcam vicine (Windy) */
+let CAMS=[],camTimer=null,camAt=null;
+async function loadCams(force){
+  if(!PREF.cams){camLayer.clearLayers();CAMS=[];return}
+  const c=ml.getCenter(),b=ml.getBounds(),r=Math.min(50,Math.max(3,dist({lat:b.getNorth(),lng:b.getWest()},{lat:b.getSouth(),lng:b.getEast()})/2000));
+  if(!force&&camAt&&dist(camAt,{lat:c.lat,lng:c.lng})<r*300)return;
+  camAt={lat:c.lat,lng:c.lng};
+  try{const res=await fetch(`${SB_URL}/functions/v1/servizi?a=webcams&lat=${c.lat.toFixed(4)}&lng=${c.lng.toFixed(4)}&r=${Math.round(r)}`,{headers:{Authorization:'Bearer '+jwt,apikey:SB_KEY}});
+    const j=await res.json();
+    if(j.attiva===false){toast('Webcam da attivare: serve la chiave gratuita di Windy (vedi Profilo → Servizi della mappa)');PREF.cams=false;savePref();return}
+    CAMS=j.webcams||[];drawCams();if(force&&!CAMS.length)toast('Nessuna webcam pubblica qui: prova ad allargare la mappa')}
+  catch(e){if(force)toast('Webcam non disponibili adesso')}
+}
+function drawCams(){camLayer.clearLayers();
+  CAMS.forEach(w=>L.marker([w.lat,w.lng],{icon:L.divIcon({html:`<div class="cam-pin"><img src="${esc(w.thumb||w.img)}" alt="" loading="lazy"></div>`,iconSize:[34,34],iconAnchor:[17,17]}),zIndexOffset:500})
+    .on('click',()=>openCam(w.id)).addTo(camLayer))}
+function openCam(id,list){const w=(list||CAMS).find(x=>x.id===id);if(!w)return;
+  openModal(`<span class="tag cat">Webcam pubblica</span><h3>${esc(w.title||'Webcam')}</h3>
+    <div class="meta">${w.city?esc(w.city)+' · ':''}${w.d!=null?'a '+fmtD(w.d)+' dal centro della mappa · ':''}${w.updated?'immagine di '+ago(Date.parse(w.updated)):''}</div>
+    <img class="camimg" src="${esc(w.img)}" alt="Immagine dalla webcam">
+    <p class="meta">Fonte: <a href="${esc(w.url)}" target="_blank" rel="noopener">Windy.com</a>. L'immagine si aggiorna ogni pochi minuti.</p>
+    <div class="btns"><button class="sec" data-close>Chiudi</button><button class="pri" data-act="whyAt" data-v="${w.lat},${w.lng}">Perché? Cerca i motivi qui</button></div>`,'cam')}
+ml.on('moveend',()=>{if(PREF.cams){clearTimeout(camTimer);camTimer=setTimeout(()=>loadCams(false),700)}});
+ml.on('load',()=>{if(PREF.cams)loadCams(true)});
+/* riavvolgi: la mappa come era fino a 24 ore fa */
+let replayT=null,rpAnim=null;
+const atT=()=>replayT??now();
+function setReplay(min){replayT=min>=0?null:now()+min*M;$('#rpRange').value=String(Math.min(0,min));
+  $('#rpLbl').textContent=replayT?(min>-60?Math.round(-min)+' min fa':Math.round(-min/60)+' h fa')+', '+new Date(replayT).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'}):'Adesso';renderMap()}
+$('#rpRange').oninput=e=>{clearInterval(rpAnim);rpAnim=null;$('#rpPlay').textContent='▶';setReplay(+e.target.value)};
+$('#rpPlay').onclick=()=>{if(rpAnim){clearInterval(rpAnim);rpAnim=null;$('#rpPlay').textContent='▶';return}
+  let m=+$('#rpRange').value;if(m>=0)m=-1440;$('#rpPlay').textContent='❚❚';
+  rpAnim=setInterval(()=>{m+=20;if(m>=0){clearInterval(rpAnim);rpAnim=null;$('#rpPlay').textContent='▶';m=0}setReplay(m)},90)};
+$('#rpClose').onclick=()=>{clearInterval(rpAnim);rpAnim=null;$('#rpPlay').textContent='▶';$('#replay').classList.add('hide');setReplay(0)};
 const meIcon=L.divIcon({className:'',html:'<div class="me-pin"></div>',iconSize:[18,18],iconAnchor:[9,9]});
 let me=null,meMarker=null,accCircle=null,simMode=false,gpsPos=null,followed=false,placeLabel='Posizione attuale',lastLook=null;
 
@@ -713,7 +927,7 @@ const mapPass=p=>mapF==='all'||(mapF==='urgent'?(!p.resolved&&urgOf(p)!=='calm')
 function renderMap(){
   layer.clearLayers();
   document.querySelectorAll('#mapF .chip').forEach(c=>c.classList.toggle('on',c.dataset.id===mapF));
-  const live=alive().filter(mapPass);
+  const T=atT(),live=(replayT?db.posts.filter(p=>p.t<=T&&p.exp>T):alive()).filter(mapPass);
   db.places.forEach(pl=>{
     const n=live.filter(p=>p.placeId===pl.id).length,s=status(pl);
     const ic=L.divIcon({className:'',html:`<div class="pl"><i style="background:${s?REP[s.type].c:'#9aa4af'}"></i>${esc(pl.name.split(' – ')[0])}${n?`<b>${n}</b>`:''}</div>`,iconSize:[0,0]});
@@ -722,12 +936,12 @@ function renderMap(){
   live.filter(p=>!p.placeId).forEach(p=>{
     const u=urgOf(p),col={alert:'#E5484D',warn:'#E08A00',calm:'#1F9D63'}[u];
     if(!p.resolved)L.circle([p.lat,p.lng],{radius:p.radius,color:col,weight:1,fillOpacity:.05,interactive:false}).addTo(layer);
-    const fresh=!p.resolved&&now()-p.t<30*M;
-    const ic=L.divIcon({className:'',html:`<div class="q-pin u-${u} ${fresh?'fresh':''} ${p.resolved?'res':''}">${p.resolved?'✓':p.type==='n'?'!':'?'}</div>`,iconSize:[36,36],iconAnchor:[18,18]});
+    const fresh=!p.resolved&&T-p.t<30*M,age=Math.min(1,Math.max(0,(T-p.t)/Math.max(1,p.exp-p.t))),op=p.resolved?.6:(1-.5*age).toFixed(2);
+    const ic=L.divIcon({className:'',html:`<div class="q-pin u-${u} ${fresh?'fresh':''} ${!p.resolved&&age<.5?'glow':''} ${p.cat==='smarrito'?'sos':''} ${p.resolved?'res':''}" style="opacity:${op}">${p.resolved?'✓':p.cat==='smarrito'?'SOS':p.type==='n'?'!':'?'}</div>`,iconSize:[36,36],iconAnchor:[18,18]});
     L.marker([p.lat,p.lng],{icon:ic}).on('click',()=>openThread(p.id)).addTo(layer);
   });
   if(mapF==='all')ZONES.forEach(z=>L.circle([z.lat,z.lng],{radius:z.radius_m,color:'#2f6fe4',weight:1.5,dashArray:'6 6',fill:false,interactive:false}).addTo(layer));
-  (mapF==='urgent'?[]:friendLocs()).forEach(f=>{
+  (mapF==='urgent'||replayT?[]:friendLocs()).forEach(f=>{
     const live=isLive(f);
     if(f.area)L.circle([f.lat,f.lng],{radius:1000,color:'#1F9D63',weight:1,fillOpacity:.04,interactive:false}).addTo(layer);
     const ic=L.divIcon({className:'',html:`<div class="fpin ${live?'on':''}">${av(f.id)}<b>${esc(user(f.id).n.split(' ')[0])}, ${live?'ora':ago(f.t)}</b></div>`,iconSize:[0,0]});
@@ -931,6 +1145,8 @@ function renderMe(){
       ${wantAlerts()?`<div class="row" style="display:block"><b>Avvisami di domande entro</b><div class="seg" style="margin-top:8px">${[[500,'500 m'],[1000,'1 km'],[3000,'3 km'],[5000,'5 km']].map(([v,l])=>`<button class="${(PROF[myId]||{}).ar===v?'on':''}" data-act="alertRad" data-id="${v}">${l}</button>`).join('')}</div><div class="meta" style="margin-top:6px">Conta anche la zona scelta da chi chiede: vale la più piccola delle due.</div></div>`:''}
       <div class="row"><div><b>Non disturbare 23–7 <span class="phase">Fase 2</span></b><div class="meta">Max 3 notifiche l'ora negli altri orari</div></div>${sw('quiet',db.me.quiet)}</div>
     </div>
+    <div class="sec-t">Servizi della mappa</div>
+    <div class="box2"><div class="row" data-act="layers" style="cursor:pointer"><div><b>3D, traffico, webcam e riavvolgi</b><div class="meta">Traffico e webcam funzionano dopo aver inserito una volta le chiavi gratuite di TomTom e Windy nel database (istruzioni nel README).</div></div><span class="meta">›</span></div></div>
     <div class="sec-t">Zone che segui</div>
     <div class="box2">${ZONES.map(z=>`<div class="row zone-row"><div class="pick" data-act="zoneShow" data-id="${z.id}"><div><b>${esc(z.name)}</b><div class="meta">Entro ${fmtD(z.radius_m)}${me?', a '+fmtD(dist(me,z))+' da te':''} · ${alive().filter(p=>dist(p,z)<=z.radius_m).length} attive ora</div></div></div><button class="small sec" data-act="zoneDel" data-id="${z.id}">Togli</button></div>`).join('')||'<div class="row"><div class="meta">Segui casa, lavoro o il tuo paese: ricevi le domande e le notizie di quella zona anche quando non ci sei.</div></div>'}
       <div class="row">${ZONES.length<10?`<button class="small pri" data-act="zoneNew">Segui la zona dove sono</button><button class="small sec" data-act="search">Cerca un posto</button>`:'<span class="meta">Puoi seguire al massimo 10 zone.</span>'}</div></div>
@@ -941,7 +1157,7 @@ function renderMe(){
       <div class="row"><div><b>Utenti bloccati</b><div class="meta">${(db.blocked||[]).length} bloccati</div></div></div>
       <div class="row"><button class="small sec red" data-act="reset">Ripristina amici e impostazioni di esempio</button></div>
     </div>
-    <p class="demo">Prototipo V10. Domande, risposte, foto, gruppi, zone seguite, amicizie e avvisi sono nel database; restano su questo telefono solo gli amici di esempio e alcune impostazioni.</p>`;
+    <p class="demo">Prototipo V11. Domande, risposte, foto, gruppi, zone seguite, amicizie e avvisi sono nel database; restano su questo telefono solo gli amici di esempio e alcune impostazioni.</p>`;
 }
 
 /* ---------- profilo di una persona ---------- */
@@ -988,6 +1204,7 @@ function openPlace(id){
   openModal(`<span class="tag cat">${esc(pl.cat)}</span><h3>${esc(pl.name)}</h3>
     <div class="meta">${d!=null?'a '+fmtD(d)+' da te · ':''}${s?`${REP[s.type].l.toLowerCase()} secondo ${s.n} segnalazion${s.n===1?'e':'i'} nell'ultima ora`:'nessuna segnalazione nell\'ultima ora'}</div>
     <div style="margin-top:6px">${stHtml(pl)}</div>
+    <button class="sec" style="width:100%;margin-top:12px" data-act="whyAt" data-v="${pl.lat},${pl.lng}" data-id="${esc(pl.name)}"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" style="vertical-align:-3px;margin-right:4px"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .8-1 1.5v.7M12 17h.01"/></svg>Perché? Cerca i motivi qui</button>
     <dl class="kv">${pl.info.map(([k,v])=>`<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>
     <label>Sei qui? Segnala com'è adesso</label>
     <div class="rep">${Object.entries(REP).map(([k,r])=>`<button data-act="report" data-id="${pl.id}" data-v="${k}"><span class="st"><i style="background:${r.c}"></i></span>${r.l}</button>`).join('')}</div>
@@ -1007,7 +1224,8 @@ function openAsk(placeId,text,sp){
   const label=pl?pl.name:sp?sp.name:placeLabel,defR=sp&&AREA.includes(sp.type)?'5000':'1000';
   openModal(`<h3>${pl||sp?'Chiedi a chi è lì':'Cosa succede qui?'}</h3><div class="meta">📍 ${esc(label)}${sp?' · '+esc(short(sp.addr)):''}</div>
     <form id="askForm">
-    <div class="seg" data-name="type" style="margin-top:12px"><button type="button" class="on" data-v="q">Domanda</button><button type="button" data-v="n">Notizia</button></div>
+    <div class="seg" data-name="type" style="margin-top:12px"><button type="button" class="on" data-v="q">Domanda</button><button type="button" data-v="n">Notizia</button><button type="button" data-v="sos">SOS</button></div>
+    <p class="meta hide" id="sosHint" style="margin:8px 0 0">SOS per animali smarriti, oggetti persi o chi cerca aiuto: avvisa chi è entro 5 km per 48 ore e crea un volantino con QR da stampare o condividere.</p>
     <textarea id="askText" maxlength="280" placeholder="Es. Perché c'è così tanta gente?" style="margin-top:10px" required>${esc(text||'')}</textarea>
     <div class="photo-pick" id="photoPick"><label for="askPhoto"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>Aggiungi una foto</label><input type="file" id="askPhoto" accept="image/*" class="hide"></div>
     <label>Categoria</label>
@@ -1019,6 +1237,9 @@ function openAsk(placeId,text,sp){
     <div class="meta" style="margin-top:10px">Pubblichi come <b>${esc(meU().n)}</b> · cambia in Profilo</div>
     <div class="btns"><button type="button" class="sec" data-close>Annulla</button><button class="pri">Pubblica</button></div></form>`,'ask');
   const f=$('#askForm');let photo=null;
+  f.querySelectorAll('[data-name="type"] button').forEach(b=>b.addEventListener('click',()=>{const sos=b.dataset.v==='sos';
+    $('#sosHint').classList.toggle('hide',!sos);$('#askText').placeholder=sos?'Es. Cane smarrito: meticcio marrone, collare rosso, risponde a Rocky':'Es. Perché c\'è così tanta gente?';
+    if(sos){const set=(n,v)=>f.querySelectorAll(`[data-name="${n}"] [data-v]`).forEach(x=>x.classList.toggle('on',x.dataset.v===v));set('cat','smarrito');set('radius','5000');set('exp','48')}}));
   const drawPick=()=>{$('#photoPick').innerHTML=photo?`<img src="${URL.createObjectURL(photo)}" alt="Anteprima"><span class="meta">Foto pronta</span><button type="button" id="photoDel">Togli</button>`
       :'<label for="askPhoto"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>Aggiungi una foto</label>';
     $('#photoPick').appendChild(inp);const d=$('#photoDel');if(d)d.onclick=()=>{photo=null;drawPick()}};
@@ -1031,10 +1252,11 @@ function openAsk(placeId,text,sp){
     if(photo){const path=`${myId}/${Date.now()}.jpg`,up=await sb.storage.from('post-photos').upload(path,photo,{contentType:'image/jpeg',cacheControl:'31536000'});
       if(up.error){toast('Foto non caricata: '+up.error.message);btn.disabled=false;btn.textContent='Pubblica';return}
       photoUrl=sb.storage.from('post-photos').getPublicUrl(path).data.publicUrl;btn.textContent='Salvo…'}
-    const id=await run(sb.rpc('create_post',{p_kind:v('type'),p_category:v('cat'),p_place_id:pl?pl.id:null,p_place_label:label,
+    const sosOn=v('type')==='sos';
+    const id=await run(sb.rpc('create_post',{p_kind:sosOn?'n':v('type'),p_category:sosOn?'smarrito':v('cat'),p_place_id:pl?pl.id:null,p_place_label:label,
       p_lat:base.lat,p_lng:base.lng,p_radius_m:+v('radius'),p_hours:+v('exp'),p_body:t,p_photo_url:photoUrl}),'Pubblicata ✓');
     if(!id){btn.disabled=false;btn.textContent='Pubblica';return}
-    if(!db.follow.includes(id))db.follow.push(id);save();openThread(id);
+    if(!db.follow.includes(id))db.follow.push(id);save();if(sosOn)openPoster(id);else openThread(id);
   };
   setTimeout(()=>$('#askText').focus(),60);
 }
@@ -1049,8 +1271,9 @@ function openThread(id){
     <h3>${esc(p.text)}</h3>${p.photo?`<a href="${esc(p.photo)}" target="_blank" rel="noopener"><img class="timg" src="${esc(p.photo)}" alt="Foto allegata"></a>`:''}
     <div class="meta">📍 ${p.placeId?`<a href="#" data-act="place" data-id="${p.placeId}">${esc(p.place)}</a>`:esc(p.place)} · zona ${fmtD(p.radius)}</div>
     ${p.resolved?`<div class="resbar">✓ Risolto${p.resolves?`, lo dicono ${p.resolves} person${p.resolves===1?'a':'e'}`:''}</div>`:''}
+    ${p.cat==='smarrito'&&!p.resolved?`<button class="pri sosbtn" data-act="poster" data-id="${p.id}">Crea il volantino con QR</button>`:''}
     <div class="acts" style="margin-top:10px"><button class="ok ${p.myConfirm?'on':''}" data-act="react" data-id="${p.id}" data-v="confirm">✓ Confermo${p.confirms?' '+p.confirms:''}</button><button class="ok ${p.myResolve?'on':''}" data-act="react" data-id="${p.id}" data-v="resolved">Risolto${p.resolves?' '+p.resolves:''}</button></div>
-    <div class="acts"><button class="${p.voted?'on':''}" data-act="voteP" data-id="${p.id}">▲ Utile ${p.votes}</button><button class="${p.follow?'on':''}" data-act="follow" data-id="${p.id}">${p.follow?'Segui ✓':'Segui'}</button><button data-act="share" data-id="${p.id}">Condividi</button>${p.by!=='me'?`<button data-act="flag" data-id="${p.by}">Segnala</button>`:`<button class="red" data-act="del" data-id="${p.id}">Elimina</button>`}</div>
+    <div class="acts"><button class="${p.voted?'on':''}" data-act="voteP" data-id="${p.id}">▲ Utile ${p.votes}</button><button class="${p.follow?'on':''}" data-act="follow" data-id="${p.id}">${p.follow?'Segui ✓':'Segui'}</button><button data-act="share" data-id="${p.id}">Condividi</button><button data-act="whyPost" data-id="${p.id}"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" style="vertical-align:-3px;margin-right:4px"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .8-1 1.5v.7M12 17h.01"/></svg>Perché?</button>${p.cat!=='smarrito'?`<button data-act="poster" data-id="${p.id}">Volantino QR</button>`:''}${p.by!=='me'?`<button data-act="flag" data-id="${p.by}">Segnala</button>`:`<button class="red" data-act="del" data-id="${p.id}">Elimina</button>`}</div>
     <label>${answers.length} rispost${answers.length===1?'a':'e'}</label>
     ${answers.length?answers.map(a=>{const au=user(a.by),near=a.d!=null&&a.d<=p.radius;return`<div class="ans ${a.best?'best':''}">
       <div class="who"><span class="who" data-act="profile" data-id="${esc(a.by)}">${av(a.by)}<b>${esc(au.n)}</b></span>${near?'<span class="near">Era lì</span>':''}${a.best?'<span class="near">Migliore</span>':''}</div>
@@ -1104,6 +1327,7 @@ function openSpot(){
   openModal(`<span class="tag cat">Cercato su OpenStreetMap</span><h3>${esc(s.name)}</h3>
     <div class="meta">${esc(short(s.addr))}${d!=null?' · a '+fmtD(d)+' da te':''}</div>
     <p class="meta" style="margin-top:8px">Non serve essere qui: la domanda arriva a chi è in zona.</p>
+    <button class="sec" style="width:100%;margin-top:10px" data-act="whyAt" data-v="${s.lat},${s.lng}" data-id="${esc(s.name)}"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" style="vertical-align:-3px;margin-right:4px"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .8-1 1.5v.7M12 17h.01"/></svg>Perché? Cerca i motivi qui</button>
     <label>Domande veloci</label>
     <div class="chips" style="margin:0 -16px">${qs.map(q=>`<button class="chip" data-act="askSpot" data-v="${esc(q)}">${esc(q)}</button>`).join('')}</div>
     ${pls.length?`<label>Posti nell'app qui intorno</label>${pls.map(p=>`<div class="row" data-act="place" data-id="${p.id}" style="cursor:pointer"><div><b>${esc(p.name)}</b><div class="meta">${esc(p.cat)}</div></div>${stHtml(p)}</div>`).join('')}`:''}
@@ -1212,6 +1436,20 @@ const actions={
       if(await run(sb.from('profiles').update({display_name:v,username:u}).eq('id',myId),'Profilo salvato'))closeModal()};
     setTimeout(()=>$('#nameIn').select(),60)},
   profile:id=>openProfile(id),
+  layers:()=>openLayers(),
+  layer:async k=>{
+    if(k==='d3')set3D(!PREF.d3);
+    if(k==='traffic')setTraffic(!PREF.traffic);
+    if(k==='cams'){PREF.cams=!PREF.cams;savePref();if(PREF.cams)loadCams(true);else{camLayer.clearLayers();CAMS=[]}}
+    if(k==='sim'){actions.sim();closeModal();return}
+    if(k==='replay'){closeModal();setTab('map');$('#replay').classList.remove('hide');setReplay(-180);return}
+    openLayers()},
+  whyAt:(v,label)=>{const [a,b]=(label||'').split(',').map(Number);const [lat,lng]=v&&v.includes(',')?v.split(',').map(Number):[a,b];openWhy(lat,lng,v&&v.includes(',')?label:'')},
+  whyPost:id=>{const p=db.posts.find(x=>x.id===id);if(p)openWhy(p.lat,p.lng,p.place.split(' · ')[0])},
+  whyAsk:(label,v)=>{const [lat,lng]=v.split(',').map(Number);closeModal();openAsk(null,'',{name:label||'Questo posto',lat,lng,addr:'',type:''})},
+  camWhy:id=>openCam(+id||id,WHYCAMS),
+  camsHere:v=>{const [lat,lng]=v.split(',').map(Number);closeModal();setTab('map');map.setView([lat,lng],13);PREF.cams=true;savePref();setTimeout(()=>loadCams(true),400)},
+  poster:id=>openPoster(id),
   mapF:id=>{mapF=id;renderMapUi();if(id==='friends'&&!friendLocs().length)toast('Nessun amico sta condividendo la posizione adesso')},
   share:async id=>{const p=db.posts.find(x=>x.id===id);if(!p)return;const url=APP_URL+'#post='+id,text=(p.type==='n'?'Notizia':'Domanda')+' su '+p.place+': '+p.text;
     try{if(navigator.share){await navigator.share({title:'App Locale',text,url});return}
@@ -1236,7 +1474,7 @@ document.addEventListener('click',e=>{
   const nr=e.target.closest('[data-n]');if(nr){const n=allN().find(x=>x.id===nr.dataset.n);if(n&&!n.read){n.read=true;
     if(n.dbId)sb.from('notifications').update({read_at:iso(now())}).eq('id',n.dbId).then(()=>{});else save();render()}}
   const a=e.target.closest('[data-act]');if(!a)return;e.preventDefault();
-  const f=actions[a.dataset.act];if(f)f(a.dataset.id,a.dataset.v,a);
+  const f=actions[a.dataset.act];if(f){if(a.dataset.act==='whyAt')f(a.dataset.v,a.dataset.id);else if(a.dataset.act==='whyAsk')f(a.dataset.id,a.dataset.v);else f(a.dataset.id,a.dataset.v,a)}
 });
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal()});
 
@@ -1305,11 +1543,11 @@ $('#aForgot').onclick=async()=>{const email=$('#aEmail').value.trim();if(!email)
 $('#aNewPass').onsubmit=async e=>{e.preventDefault();const{data,error}=await sb.auth.updateUser({password:$('#aPass2').value});
   if(error){aMsg(itErr(error.message),'err');return}recovering=false;aMsg('Password aggiornata ✓','ok');const{data:{session}}=await sb.auth.getSession();if(session)enter(session)};
 $('#aOut').onclick=async()=>{await sb.auth.signOut();location.replace(APP_URL)};
-sb.auth.onAuthStateChange((ev,session)=>{
+sb.auth.onAuthStateChange((ev,session)=>{jwt=session?session.access_token:'';
   if(ev==='PASSWORD_RECOVERY'){recovering=true;showAuth('aNewPass');return}
   if(ev==='SIGNED_IN'&&session)setTimeout(()=>enter(session),0);
 });
-(async()=>{const{data:{session}}=await sb.auth.getSession();if(session)enter(session);else showAuth('aMain')})();
+(async()=>{const{data:{session}}=await sb.auth.getSession();if(session){jwt=session.access_token;enter(session)}else showAuth('aMain')})();
 }
 </script>
 </body>
