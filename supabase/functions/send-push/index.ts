@@ -1,4 +1,4 @@
-// App Locale – V05 – funzione send-push
+// App Locale – V10 – funzione send-push (V10: apre anche i gruppi)
 // Chiamata dal database (trigger su public.notifications) per ogni nuovo avviso.
 // Legge chiavi e telefoni registrati direttamente dal database e manda la notifica push (Web Push).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
@@ -22,8 +22,8 @@ Deno.serve(async (req: Request) => {
   const { notification_id } = await req.json().catch(() => ({}));
   if (!notification_id) return json({ error: "notification_id mancante" }, 400);
 
-  const [n] = await sql<{ user_id: string; body: string; post_id: string | null; kind: string }[]>`
-    select user_id, body, post_id, kind from public.notifications where id = ${notification_id}`;
+  const [n] = await sql<{ user_id: string; body: string; post_id: string | null; group_id: string | null; kind: string }[]>`
+    select user_id, body, post_id, group_id, kind from public.notifications where id = ${notification_id}`;
   if (!n) return json({ error: "avviso non trovato" }, 404);
 
   const subs = await sql<{ id: number; endpoint: string; p256dh: string; auth: string }[]>`
@@ -33,7 +33,8 @@ Deno.serve(async (req: Request) => {
     select count(*)::int as unread from public.notifications where user_id = ${n.user_id} and read_at is null`;
 
   webpush.setVapidDetails(s.vapid_subject, s.vapid_public, s.vapid_private);
-  const url = n.post_id ? `./#post=${n.post_id}` : n.kind.startsWith("friend") ? "./#tab=me" : "./#tab=act";
+  const url = n.post_id ? `./#post=${n.post_id}` : n.group_id ? `./#group=${n.group_id}`
+    : n.kind.startsWith("friend") ? "./#tab=me" : "./#tab=act";
   const payload = JSON.stringify({ title: "App Locale", body: n.body, url, tag: `n${notification_id}`, badge: unread });
 
   let sent = 0;
