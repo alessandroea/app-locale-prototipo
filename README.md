@@ -1,5 +1,20 @@
 # App Locale – prototipo
 
-Prototipo HTML (ultima: V03 – luoghi con stato live, feed, gruppi, amici, profilo; dati di esempio su Richmond) (mappa, posizione, domande sul luogo). Solo test: 1 utente, dati salvati nel browser.
+Prototipo web dell'app basata sulla posizione di Alessandro e Giovanni.
+
+**Ultima: V04** – accesso privato (email e password o Google) e database condiviso su Supabase.
+Luoghi, stato live, domande, risposte e voti sono salvati nel database e arrivano in tempo reale all'altro telefono.
+Gruppi, amici, notifiche e impostazioni restano demo salvate solo sul telefono.
 
 Prova: https://alessandroea.github.io/app-locale-prototipo/
+Versione precedente (V03, solo nel browser): https://alessandroea.github.io/app-locale-prototipo/v03/
+
+## Database (Supabase)
+
+- Progetto `app-locale` nell'organizzazione "Local Intelligence", regione Francoforte (UE), piano gratuito.
+- `supabase/01_schema.sql`: tabelle, PostGIS, regole di accesso (RLS) e funzioni.
+- `supabase/02_seed_demo.sql`: membri ammessi e dati di esempio di V03 (Richmond).
+- Possono entrare solo le email nella tabella `members`. Per aggiungere una persona:
+  `insert into public.members (email, name, color) values ('email@esempio.com', 'Nome', '#8e4ec6');`
+- Privacy: le coordinate di un post libero sono arrotondate a ~100 m; di chi risponde si salva solo la distanza dal posto.
+- La chiave nel codice è quella pubblica (publishable): i dati sono protetti dalle regole RLS.

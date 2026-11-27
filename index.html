@@ -6,12 +6,13 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#ffffff">
-<title>App Locale – V03</title>
+<title>App Locale – V04</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>
-/* V03 prototipo – App Locale (Alessandro & Giovanni)
-   Demo: 1 utente reale + utenti e conversazioni di esempio attorno a Richmond.
-   Tutto salvato nel browser (localStorage). */
+/* V04 prototipo – App Locale (Alessandro & Giovanni)
+   Accesso privato con Supabase (email/password o Google).
+   Luoghi, stato live, domande, risposte e voti salvati nel database condiviso.
+   Gruppi, amici, notifiche e impostazioni restano demo su questo telefono. */
 :root{--bg:#fff;--ink:#14202b;--mute:#6b7785;--line:#e6e9ed;--acc:#e5484d;--news:#2f6fe4;--me:#1677ff;--soft:#f3f5f7;--ok:#30a46c;--tab:64px}
 *{box-sizing:border-box;min-width:0}
 html,body{height:100%;margin:0}
@@ -129,6 +130,23 @@ label{display:block;font-size:13px;color:var(--mute);margin:12px 0 6px}
 .pl b{background:var(--acc);color:#fff;border-radius:99px;padding:2px 6px;font-size:11px}
 .leaflet-control-attribution{font-size:10px}
 @media(prefers-reduced-motion:reduce){.toast,.sw::after{transition:none}}
+
+/* accesso */
+.auth{position:fixed;z-index:40;inset:0;background:#fff;overflow-y:auto;display:flex;align-items:center;justify-content:center;padding:calc(env(safe-area-inset-top) + 24px) 20px calc(env(safe-area-inset-bottom) + 24px)}
+.abox{width:100%;max-width:380px}
+.abox h1{font-size:32px;line-height:1.1;margin:0 0 6px}
+.logo{width:56px;height:56px;border-radius:16px;background:var(--acc);color:#fff;display:grid;place-items:center;font-size:28px;font-weight:700;margin-bottom:16px}
+.abox input{margin-top:8px}
+.big{width:100%;min-height:50px;font-size:17px;margin-top:12px}
+.gbtn{width:100%;min-height:50px;border:1px solid var(--line);background:#fff;font-weight:600;display:flex;align-items:center;justify-content:center;gap:10px}
+.gbtn svg{width:20px;height:20px}
+.or{display:flex;align-items:center;gap:10px;color:var(--mute);font-size:13px;margin:16px 0 4px}
+.or::before,.or::after{content:"";flex:1;height:1px;background:var(--line)}
+.link{min-height:40px;padding:0;color:var(--me);font-size:15px}
+.amsg{font-size:14px;margin:12px 0 0;min-height:20px}
+.amsg.err{color:#c0392b}
+.amsg.ok{color:var(--ok)}
+.loading{position:fixed;z-index:11;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top) + 76px);background:#fff;color:var(--ink);font-size:13px;padding:6px 12px;border-radius:99px;box-shadow:0 2px 10px rgba(0,0,0,.15)}
 </style>
 </head>
 <body>
@@ -168,11 +186,53 @@ label{display:block;font-size:13px;color:var(--mute);margin:12px 0 6px}
 
 <div class="modal hide" id="modal" role="dialog" aria-modal="true"><div class="mbox" id="mbox"></div></div>
 <div class="toast" id="toast" role="status"></div>
+<div class="loading hide" id="loading">Carico dal database…</div>
+
+<!-- ACCESSO -->
+<div class="auth" id="auth">
+  <div class="abox">
+    <div class="logo">?</div>
+    <h1>App Locale</h1>
+    <p class="sub">Prototipo privato di Alessandro e Giovanni</p>
+    <div id="aMain">
+      <button class="gbtn" id="aGoogle" type="button"><svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>Continua con Google</button>
+      <div class="or">oppure con email</div>
+      <form id="aForm">
+        <input type="email" id="aEmail" placeholder="Email" autocomplete="email" required>
+        <input type="password" id="aPass" placeholder="Password (almeno 6 caratteri)" autocomplete="current-password" minlength="6" required>
+        <button class="pri big" id="aSubmit">Accedi</button>
+      </form>
+      <div style="display:flex;justify-content:space-between;gap:8px;margin-top:6px">
+        <button class="link" id="aSwitch" type="button">Prima volta? Crea l'account</button>
+        <button class="link" id="aForgot" type="button">Password dimenticata?</button>
+      </div>
+    </div>
+    <form id="aNewPass" class="hide">
+      <label for="aPass2">Scegli una nuova password</label>
+      <input type="password" id="aPass2" minlength="6" autocomplete="new-password" required>
+      <button class="pri big">Salva la nuova password</button>
+    </form>
+    <div id="aDenied" class="hide">
+      <p>L'account <b id="aWho"></b> non è tra i membri del prototipo.</p>
+      <p class="meta">Per ora possono entrare solo Alessandro e Giovanni. Se hai usato un'altra email, esci e riprova con quella giusta.</p>
+      <button class="sec big" id="aOut" type="button">Esci</button>
+    </div>
+    <p class="amsg" id="aMsg" role="status"></p>
+    <p class="demo">Prototipo V04 · dati salvati nel database condiviso</p>
+  </div>
+</div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 {
-const KEY='applocale_v03', M=60e3, H=3600e3;
+const KEY='applocale_v04_local', M=60e3, H=3600e3;
+/* ---------- Supabase (chiave pubblica: protetta dalle regole RLS del database) ---------- */
+const SB_URL='https://tigxpqmedwlwthomvunb.supabase.co';
+const SB_KEY='sb_publishable_np6dcaeo0Hbbd63wlzb1FQ_Nz5_ryoU';
+const APP_URL=location.origin+location.pathname;
+const sb=supabase.createClient(SB_URL,SB_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+let myId=null,myEmail='',PROF={};
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const now=()=>Date.now();
@@ -192,36 +252,10 @@ const REP={tranquillo:{l:'Tranquillo',c:'#30a46c'},affollato:{l:'Affollato',c:'#
   evento:{l:'Evento',c:'#8e4ec6'},ritardi:{l:'Ritardi',c:'#e5484d'},chiuso:{l:'Chiuso',c:'#6b7785'}};
 const CATS={traffico:'Traffico',trasporti:'Trasporti',eventi:'Eventi',natura:'Natura',sport:'Sport',cibo:'Cibo',info:'Info'};
 
-/* ---------- dati demo (tempi relativi ad adesso) ---------- */
+/* ---------- dati demo SOLO locali (gruppi, notifiche, amici, impostazioni) ----------
+   Luoghi, domande e risposte di esempio ora sono nel database (supabase/02_seed_demo.sql). */
 function seed(){
   const t=now(), ago=m=>t-m*M;
-  const P=(id,name,cat,lat,lng,info,reps)=>({id,name,cat,lat,lng,info,reports:reps.map(([type,m])=>({type,t:ago(m),demo:true}))});
-  const places=[
-    P('kew','Kew Gardens – Victoria Gate','Giardino botanico',51.4786,-0.2930,[['Tipo','Giardini botanici (UNESCO)'],['Inverno','Evento serale di Natale con biglietti a fascia oraria'],['Consiglio','Entrata a orario: inutile arrivare molto prima']],[['affollato',8],['coda',14],['affollato',22]]),
-    P('sheen','Passaggio a livello Sheen Lane','Incrocio',51.4677,-0.2668,[['Tipo','Passaggio a livello vicino a Mortlake'],['Nota','Nelle ore di punta le barriere restano giù a lungo'],['Alternativa','Clifford Avenue / Chalker\'s Corner']],[['coda',5],['coda',11]]),
-    P('green','Richmond Green','Parco',51.4613,-0.3063,[['Tipo','Prato pubblico, cricket d\'estate'],['Intorno','Pub, caffè e teatro'],['Consiglio','Nei weekend di sole si riempie dopo pranzo']],[['tranquillo',18]]),
-    P('station','Stazione di Richmond','Trasporti',51.4631,-0.3017,[['Linee','District, Overground, South Western Railway'],['Bus','Fermate davanti alla stazione'],['Consiglio','Nei giorni di partita a Twickenham è molto affollata']],[['ritardi',9],['affollato',16]]),
-    P('bridge','Richmond Bridge e Riverside','Fiume',51.4572,-0.3071,[['Tipo','Ponte storico sul Tamigi'],['Attenzione','Con l\'alta marea il lungofiume si allaga'],['Consiglio','Prendete la strada sopra quando è allagato']],[['chiuso',28]]),
-    P('terrace','Richmond Hill – The Terrace','Panorama',51.4545,-0.3020,[['Tipo','Belvedere sul Tamigi'],['Curiosità','Vista protetta da una legge del 1902'],['Consiglio','Bellissima al tramonto']],[]),
-    P('park','Richmond Park – Pembroke Lodge','Parco',51.4446,-0.2925,[['Tipo','Parco reale con cervi'],['Attenzione','Tenersi a distanza dai cervi, soprattutto in autunno'],['Vista','Da King Henry\'s Mound si vede St Paul\'s']],[['tranquillo',35]]),
-    P('twick','Twickenham Stadium','Sport',51.4560,-0.3415,[['Tipo','Stadio del rugby'],['Giorni di partita','Treni e strade pieni da ore prima'],['Consiglio','Meglio arrivare a piedi da Twickenham']],[]),
-    P('putney','Putney High Street','Strada',51.4610,-0.2165,[['Tipo','Via dei negozi vicino al ponte di Putney'],['Bus','Molte linee verso il centro'],['Consiglio','Ore di punta lente verso il ponte']],[['affollato',12]])
-  ];
-  const A=(by,text,m,d,votes=0,best=false)=>({id:uid(),by,text,t:ago(m),d,votes,voted:false,best,demo:true});
-  const Q=(type,cat,placeId,by,text,m,expH,answers,votes=0)=>{const p=places.find(x=>x.id===placeId);
-    return{id:uid(),type,cat,placeId,lat:p.lat+(Math.random()-.5)*.0008,lng:p.lng+(Math.random()-.5)*.0012,place:p.name,by,text,t:ago(m),exp:ago(m)+expH*H,radius:1000,answers,votes,voted:false,follow:false,demo:true}};
-  const posts=[
-    Q('q','eventi','kew','priya','Perché c\'è così tanta coda alla Victoria Gate?',25,3,[A('tom','È l\'evento di Natale: si entra per fascia oraria, la coda scorre in una decina di minuti.',19,60,12,true),A('giulia','Se avete il biglietto per un orario più tardi non serve arrivare adesso.',12,140,5)],9),
-    Q('n','traffico','sheen','ben','Barriere giù da 12 minuti, coda fino a Upper Richmond Road',8,1,[A('hannah','Confermo, meglio girare da Clifford Avenue.',4,220,3)],6),
-    Q('q','eventi','green','fede','Cosa succede sul Green stasera? Si sente musica',40,3,[A('mark','Prove del concerto di Natale della scuola, finiscono verso le 19.',31,90,4,true)],3),
-    Q('n','trasporti','station','mark','District line sospesa verso Turnham Green: bus sostitutivi davanti alla stazione',15,2,[A('priya','I bus sostitutivi passano circa ogni 10 minuti.',9,40,2)],11),
-    Q('q','natura','park','sara','Cervi vicino al sentiero di Pembroke Lodge: si passa tranquilli?',62,3,[A('priya','Sì, ma restate a 50 m: in questo periodo i maschi sono nervosi.',50,300,7,true),A('ben','Cani al guinzaglio, mi raccomando.',41,500,2)],5),
-    Q('q','sport','twick','priya','Sabato c\'è partita? Vorrei evitare il treno',170,24,[A('mark','Sì, nel pomeriggio: treni pieni da mezzogiorno, meglio la mattina.',150,700,6)],4),
-    Q('n','info','bridge','giulia','Riverside allagato con l\'alta marea, passate dalla strada sopra',30,3,[A('tom','Grazie, salvato le scarpe!',22,80,1)],8),
-    Q('q','cibo','putney','hannah','Qualche posto aperto per un caffè dopo le 18 qui vicino?',20,3,[A('fede','Un paio di caffè sulla High Street chiudono alle 19, i pub servono caffè anche più tardi.',14,120,3)],2),
-    Q('q','info','terrace','tom','Com\'è la visibilità dalla terrazza adesso?',48,3,[A('giulia','Un po\' di foschia sul fiume, ma il tramonto si vede bene.',35,30,4,true)],3),
-    Q('n','eventi','putney','ben','Mercatino di Natale davanti alla chiesa fino alle 20',55,5,[],5)
-  ];
   const G=(id,name,mem,desc,col,gp)=>({id,name,members:mem,desc,c:col,joined:false,posts:gp.map(([by,text,m,r])=>({id:uid(),by,text,t:ago(m),replies:r,demo:true}))});
   const groups=[
     G('tennis','Tennis a Richmond',128,'Campi liberi, compagni di gioco e tornei in zona.','#30a46c',[['mark','Qualcuno per un doppio domenica mattina al Old Deer Park?',90,4],['giulia','I campi coperti sono pieni fino a gennaio, prenotate presto.',600,7]]),
@@ -232,30 +266,96 @@ function seed(){
     G('rugby','Rugby a Twickenham',389,'Partite, biglietti, come arrivare e dove guardarle.','#3e63dd',[['mark','Pub consigliati per vedere la partita se non avete il biglietto?',240,18]])
   ];
   const notifs=[
-    {id:uid(),text:'Nuova domanda vicino a te: “Barriere giù da 12 minuti…”',t:ago(8),read:false,post:posts[1].id},
+    {id:uid(),text:'Nuova domanda vicino a te: “Barriere giù da 12 minuti…”',t:ago(8),read:false,post:'419f340c-39f6-4804-8cff-61d7f1d0e77f'},
     {id:uid(),text:'Sara runs vuole essere tua amica',t:ago(50),read:false,tab:'me'},
-    {id:uid(),text:'Molto votata intorno a te: “District line sospesa…”',t:ago(15),read:false,post:posts[3].id},
-    {id:uid(),text:'Benvenuto! Questa è una demo con dati di esempio attorno a Richmond.',t:ago(120),read:true}
+    {id:uid(),text:'Molto votata intorno a te: “District line sospesa…”',t:ago(15),read:false,post:'fd7ef139-0be4-4d1e-82d4-799267b79a3e'},
+    {id:uid(),text:'Benvenuto in V04! Domande e risposte ora sono salvate nel database condiviso con Giovanni.',t:ago(1),read:false}
   ];
-  return{v:3,seededAt:t,places,posts,groups,notifs,
+  return{v:4,seededAt:t,groups,notifs,follow:[],blocked:[],
     friends:{giulia:'friend',mark:'friend',sara:'request'},
-    me:{name:'Alessandro',anon:false,precision:'200',radius:'1000',quiet:true,areas:['Richmond','Putney'],points:0}};
+    me:{name:'',anon:false,precision:'200',radius:'1000',quiet:true,areas:['Richmond','Putney'],points:0}};
 }
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 
 /* ---------- salvataggio ---------- */
+// db.places e db.posts arrivano dal database; il resto è locale (questo telefono).
 let db;
 try{db=JSON.parse(localStorage.getItem(KEY))}catch(e){}
-if(!db||db.v!==3)db=seed();
-else{ // sposta i dati demo in avanti, così sembrano sempre "live"
+if(!db||db.v!==4)db=seed();
+else{ // sposta i dati demo locali in avanti, così sembrano sempre "live"
   const d=now()-db.seededAt;
-  db.posts.forEach(p=>{if(p.demo){p.t+=d;p.exp+=d}p.answers.forEach(a=>{if(a.demo)a.t+=d})});
-  db.places.forEach(pl=>pl.reports.forEach(r=>{if(r.demo)r.t+=d}));
   db.groups.forEach(g=>g.posts.forEach(x=>{if(x.demo)x.t+=d}));
   db.seededAt=now();
 }
-const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(db))}catch(e){}};
+db.places=[];db.posts=[];db.follow=db.follow||[];db.blocked=db.blocked||[];
+const save=()=>{try{const{places,posts,...loc}=db;localStorage.setItem(KEY,JSON.stringify(loc))}catch(e){}};
 save();
+
+/* ---------- lettura dal database ---------- */
+const iso=ms=>new Date(ms).toISOString();
+async function load(){
+  $('#loading').classList.remove('hide');
+  const since=iso(now()-6*H);
+  const [pl,rp,po,an,vo,pr]=await Promise.all([
+    sb.from('places').select('id,name,category,lat,lng,info'),
+    sb.from('place_reports').select('place_id,status,is_demo,demo_offset_min,created_at').or(`is_demo.eq.true,created_at.gt.${since}`),
+    sb.from('posts').select('id,kind,category,place_id,place_label,lat,lng,radius_m,body,author_id,demo_author,is_demo,demo_offset_min,base_votes,best_answer_id,created_at,expires_at').or(`is_demo.eq.true,expires_at.gt.${since}`),
+    sb.from('answers').select('id,post_id,body,distance_m,author_id,demo_author,is_demo,demo_offset_min,base_votes,created_at'),
+    sb.from('votes').select('user_id,post_id,answer_id'),
+    sb.from('profiles').select('id,display_name,color')
+  ]);
+  $('#loading').classList.add('hide');
+  const err=[pl,rp,po,an,vo,pr].find(r=>r.error);
+  if(err){toast('Errore dal database: '+err.error.message);return false}
+  PROF={};pr.data.forEach(p=>PROF[p.id]={n:p.display_name,c:p.color});
+  if(PROF[myId]){db.me.name=PROF[myId].n}
+  const T=r=>r.is_demo?now()-(r.demo_offset_min||0)*M:Date.parse(r.created_at);
+  const who=r=>r.author_id?(r.author_id===myId?'me':r.author_id):r.demo_author;
+  const vP={},vA={},myP=new Set(),myA=new Set();
+  vo.data.forEach(v=>{if(v.post_id){vP[v.post_id]=(vP[v.post_id]||0)+1;if(v.user_id===myId)myP.add(v.post_id)}
+    if(v.answer_id){vA[v.answer_id]=(vA[v.answer_id]||0)+1;if(v.user_id===myId)myA.add(v.answer_id)}});
+  db.places=pl.data.map(p=>({id:p.id,name:p.name,cat:p.category,lat:p.lat,lng:p.lng,info:p.info||[],
+    reports:rp.data.filter(r=>r.place_id===p.id).map(r=>({type:r.status,t:T(r),demo:r.is_demo}))}));
+  const blocked=new Set(db.blocked);
+  db.posts=po.data.map(p=>{const t=T(p),dur=Date.parse(p.expires_at)-Date.parse(p.created_at);
+    return{id:p.id,type:p.kind,cat:p.category,placeId:p.place_id,lat:p.lat,lng:p.lng,place:p.place_label,by:who(p),mine:p.author_id===myId,
+      text:p.body,t,exp:p.is_demo?t+dur:Date.parse(p.expires_at),radius:p.radius_m,
+      votes:p.base_votes+(vP[p.id]||0),voted:myP.has(p.id),follow:db.follow.includes(p.id)||p.author_id===myId,demo:p.is_demo,
+      answers:an.data.filter(a=>a.post_id===p.id&&!blocked.has(who(a))).map(a=>({id:a.id,by:who(a),text:a.body,t:T(a),d:a.distance_m,
+        votes:a.base_votes+(vA[a.id]||0),voted:myA.has(a.id),best:a.id===p.best_answer_id,demo:a.is_demo}))}})
+    .filter(p=>!blocked.has(p.by));
+  return true;
+}
+let reloadT=null;
+function reloadSoon(){clearTimeout(reloadT);reloadT=setTimeout(async()=>{if(await load()){render();refreshModal()}},400)}
+function refreshModal(){
+  if(modalKind==='thread'&&openId){const ta=$('#ansText');if(!ta||!ta.value)openThread(openId)}
+  if(modalKind==='place'&&openId)openPlace(openId);
+}
+async function run(promise,okMsg){
+  const{data,error}=await promise;
+  if(error){toast('Non salvato: '+error.message);return null}
+  if(okMsg)toast(okMsg);
+  await load();render();return data??true;
+}
+
+/* ---------- tempo reale: le novità di Giovanni (o tue da un altro telefono) arrivano subito ---------- */
+function subscribe(){
+  const ch=sb.channel('app-locale-live');
+  ['posts','answers','votes','place_reports'].forEach(t=>ch.on('postgres_changes',{event:'*',schema:'public',table:t},e=>onLive(t,e)));
+  ch.subscribe();
+}
+function onLive(table,e){
+  const r=e.new||{};
+  if(e.eventType==='INSERT'&&r.author_id&&r.author_id!==myId){
+    const n=(PROF[r.author_id]||{}).n||'Qualcuno';
+    if(table==='posts'){db.notifs.push({id:uid(),text:`${n}: “${String(r.body).slice(0,60)}”`,t:now(),read:false,post:r.id});toast('Nuova domanda da '+n)}
+    if(table==='answers'){const p=db.posts.find(x=>x.id===r.post_id);
+      if(p&&(p.by==='me'||p.follow)){db.notifs.push({id:uid(),text:`${n} ha risposto: “${p.text.slice(0,50)}”`,t:now(),read:false,post:p.id});toast('Nuova risposta da '+n)}}
+    save();
+  }
+  reloadSoon();
+}
 
 /* ---------- utilità ---------- */
 function dist(a,b){const R=6371000,r=x=>x*Math.PI/180,dLa=r(b.lat-a.lat),dLo=r(b.lng-a.lng);
@@ -265,8 +365,8 @@ function ago(t){const s=(now()-t)/1000;if(s<60)return'adesso';if(s<3600)return M
 function left(t){const m=(t-now())/M;return m<60?Math.max(1,Math.round(m))+' min':Math.round(m/60)+' h'}
 function toast(t){const e=$('#toast');e.textContent=t;e.classList.add('show');clearTimeout(e._t);e._t=setTimeout(()=>e.classList.remove('show'),2400)}
 const alive=()=>db.posts.filter(p=>p.exp>now());
-const meU=()=>({n:db.me.anon?'Anonimo':db.me.name,c:'#14202b'});
-const user=id=>id==='me'?meU():U[id];
+const meU=()=>({n:db.me.name||'Io',c:(PROF[myId]||{}).c||'#14202b'});
+const user=id=>id==='me'?meU():U[id]||PROF[id]||{n:'Utente',c:'#6b7785'};
 const ini=n=>n.split(/\s+/).map(w=>w[0]).join('').slice(0,2).toUpperCase();
 const av=(id,cls='')=>{const u=user(id);return`<span class="av ${cls}" style="background:${u.c}">${esc(ini(u.n))}</span>`};
 const placeOf=p=>db.places.find(x=>x.id===p.placeId);
@@ -334,7 +434,7 @@ function postCard(p,full){
   return`<button class="card" data-act="thread" data-id="${esc(p.id)}">
     <div class="who">${av(p.by)}<div><b>${esc(u.n)}</b><div class="meta">${esc(p.place)} · ${ago(p.t)}</div></div></div>
     <p class="ptxt">${esc(p.text)}</p>
-    <div class="meta"><span class="tag ${p.type==='n'?'news':''}">${p.type==='n'?'Notizia':'Domanda'}</span> <span class="tag cat">${esc(CATS[p.cat]||'Info')}</span>
+    <div class="meta"><span class="tag ${p.type==='n'?'news':''}">${p.type==='n'?'Notizia':'Domanda'}</span> <span class="tag cat">${esc(CATS[p.cat]||'Info')}</span>${p.demo?' <span class="tag cat">Esempio</span>':''}
     · ${p.answers.length} rispost${p.answers.length===1?'a':'e'} · ${p.votes} utili${p.d!=null?' · a '+fmtD(p.d):''}${full?' · scade tra '+left(p.exp):''}</div></button>`;
 }
 function renderMapUi(){
@@ -343,7 +443,7 @@ function renderMapUi(){
   $('#placesRow').innerHTML=pls.map(pl=>`<button class="pc" data-act="place" data-id="${pl.id}"><b>${esc(pl.name)}</b>${stHtml(pl)}<div class="meta">${pl.d!=null?fmtD(pl.d):esc(pl.cat)}</div></button>`).join('');
   const list=withD(alive()).sort((a,b)=>(a.d??0)-(b.d??0));
   $('#count').textContent=list.length+' attive';
-  $('#list').innerHTML=list.map(p=>postCard(p)).join('')+'<p class="demo">Utenti, luoghi e conversazioni sono dati di esempio.</p>';
+  $('#list').innerHTML=list.map(p=>postCard(p)).join('')+'<p class="demo">Le conversazioni con “Esempio” sono demo; le altre sono vostre, salvate nel database.</p>';
 }
 
 /* ---------- viste ---------- */
@@ -375,7 +475,7 @@ function renderFeed(){
     <div class="chips">${F.map(([k,l])=>`<button class="chip ${feedF===k?'on':''}" data-act="feedF" data-id="${k}">${l}</button>`).join('')}</div>
     <div class="chips"><button class="chip ${!feedCat?'on':''}" data-act="feedCat" data-id="">Tutte</button>${Object.entries(CATS).map(([k,l])=>`<button class="chip ${feedCat===k?'on':''}" data-act="feedCat" data-id="${k}">${l}</button>`).join('')}</div>
     ${list.length?list.map(p=>postCard(p,true)).join(''):'<p class="empty">Niente qui per ora. Prova un altro filtro.</p>'}
-    <p class="demo">Dati di esempio</p>`;
+    <p class="demo">“Esempio” = demo · le altre sono vostre</p>`;
 }
 function renderGroups(){
   const mine=db.groups.filter(g=>g.joined),other=db.groups.filter(g=>!g.joined);
@@ -409,7 +509,7 @@ function renderMe(){
 
     <div class="sec-t">Privacy</div>
     <div class="box2">
-      <div class="row"><div><b>Modalità anonima</b><div class="meta">Gli altri vedono “Anonimo” al posto del nome</div></div>${sw('anon',db.me.anon)}</div>
+      <div class="row"><div><b>Modalità anonima <span class="phase">Fase 2</span></b><div class="meta">Nel prototipo gli altri vedono il tuo nome</div></div>${sw('anon',db.me.anon)}</div>
       <div class="row" style="display:block"><b>Precisione mostrata agli altri</b><div class="meta" style="margin-bottom:8px">La tua posizione esatta non è mai visibile</div>${seg('precision',[['200','~200 m'],['1000','Quartiere'],['5000','Città']])}</div>
     </div>
     <div class="sec-t">Notifiche</div>
@@ -422,11 +522,12 @@ function renderMe(){
       <div class="row"><button class="small pri" data-act="areaAdd">Segui la zona dove sono adesso</button></div></div>
     <div class="sec-t">Account</div>
     <div class="box2">
-      <div class="row"><div><b>Accedi con Apple</b><div class="meta">Nell'app vera: niente password, email nascosta</div></div><span class="phase">Fase 2</span></div>
+      <div class="row"><div><b>${esc(myEmail)}</b><div class="meta">Accesso attivo · domande e risposte nel database condiviso</div></div><button class="small sec" data-act="logout">Esci</button></div>
+      <div class="row"><div><b>Accedi con Apple</b><div class="meta">Nell'app iPhone: niente password, email nascosta</div></div><span class="phase">Fase 2</span></div>
       <div class="row"><div><b>Utenti bloccati</b><div class="meta">${(db.blocked||[]).length} bloccati</div></div></div>
-      <div class="row"><button class="small sec red" data-act="reset">Elimina i miei dati e ripristina la demo</button></div>
+      <div class="row"><button class="small sec red" data-act="reset">Ripristina gruppi, amici e impostazioni demo</button></div>
     </div>
-    <p class="demo">Prototipo V03 · dati salvati solo su questo telefono</p>`;
+    <p class="demo">Prototipo V04 · domande, risposte, voti e stato dei luoghi nel database · gruppi, amici e notifiche solo su questo telefono</p>`;
 }
 
 /* ---------- modale ---------- */
@@ -470,12 +571,13 @@ function openAsk(placeId,text){
     <div class="meta" style="margin-top:10px">Pubblichi come <b>${esc(meU().n)}</b> · cambia in Profilo</div>
     <div class="btns"><button type="button" class="sec" data-close>Annulla</button><button class="pri">Pubblica</button></div></form>`,'ask');
   const f=$('#askForm');
-  f.onsubmit=e=>{e.preventDefault();const t=$('#askText').value.trim();if(!t)return;
+  f.onsubmit=async e=>{e.preventDefault();const t=$('#askText').value.trim();if(!t)return;
     const v=n=>f.querySelector(`[data-name="${n}"] .on`).dataset.v;
-    const base=pl||me;
-    const p={id:uid(),type:v('type'),cat:v('cat'),placeId:pl?pl.id:null,lat:base.lat,lng:base.lng,place:pl?pl.name:placeLabel,by:'me',text:t,
-      t:now(),exp:now()+(+v('exp'))*H,radius:+v('radius'),answers:[],votes:0,voted:false,follow:true};
-    db.posts.push(p);save();toast('Pubblicata ✓ Avvisiamo chi è in zona');openThread(p.id);render();simulateReply(p.id);
+    const base=pl||me,btn=f.querySelector('.pri');btn.disabled=true;btn.textContent='Salvo…';
+    const id=await run(sb.rpc('create_post',{p_kind:v('type'),p_category:v('cat'),p_place_id:pl?pl.id:null,p_place_label:pl?pl.name:placeLabel,
+      p_lat:base.lat,p_lng:base.lng,p_radius_m:+v('radius'),p_hours:+v('exp'),p_body:t}),'Pubblicata ✓ salvata nel database');
+    if(!id){btn.disabled=false;btn.textContent='Pubblica';return}
+    if(!db.follow.includes(id))db.follow.push(id);save();openThread(id);
   };
   setTimeout(()=>$('#askText').focus(),60);
 }
@@ -491,15 +593,15 @@ function openThread(id){
     <div class="meta">📍 ${p.placeId?`<a href="#" data-act="place" data-id="${p.placeId}">${esc(p.place)}</a>`:esc(p.place)} · zona ${fmtD(p.radius)}</div>
     <div class="acts" style="margin-top:8px"><button class="${p.voted?'on':''}" data-act="voteP" data-id="${p.id}">▲ Utile ${p.votes}</button><button class="${p.follow?'on':''}" data-act="follow" data-id="${p.id}">${p.follow?'Segui ✓':'Segui'}</button>${p.by!=='me'?`<button data-act="flag" data-id="${p.by}">Segnala</button>`:`<button class="red" data-act="del" data-id="${p.id}">Elimina</button>`}</div>
     <label>${answers.length} rispost${answers.length===1?'a':'e'}</label>
-    ${answers.length?answers.map(a=>{const au=user(a.by),near=a.d<=p.radius;return`<div class="ans ${a.best?'best':''}">
+    ${answers.length?answers.map(a=>{const au=user(a.by),near=a.d!=null&&a.d<=p.radius;return`<div class="ans ${a.best?'best':''}">
       <div class="who">${av(a.by)}<b>${esc(au.n)}</b>${near?'<span class="near">Era lì</span>':''}${a.best?'<span class="near">Migliore</span>':''}</div>
-      <p>${esc(a.text)}</p><div class="meta">da ${fmtD(a.d)} dal posto · ${ago(a.t)}${a.sim?' · risposta simulata':''}</div>
+      <p>${esc(a.text)}</p><div class="meta">${a.d!=null?'da '+fmtD(a.d)+' dal posto':'distanza non nota'} · ${ago(a.t)}${a.demo?' · esempio':''}</div>
       <div class="acts"><button class="${a.voted?'on':''}" data-act="voteA" data-id="${p.id}" data-v="${a.id}">▲ Utile ${a.votes}</button>
       ${p.by==='me'&&!a.best&&a.by!=='me'?`<button data-act="best" data-id="${p.id}" data-v="${a.id}">Segna migliore</button>`:''}
-      ${a.by!=='me'?`<button data-act="flag" data-id="${a.by}">Segnala</button>`:''}</div></div>`}).join(''):'<p class="empty">Ancora nessuna risposta. Chi è in zona riceve un avviso.</p>'}
+      ${a.by!=='me'?`<button data-act="flag" data-id="${a.by}">Segnala</button>`:`<button class="red" data-act="delA" data-id="${p.id}" data-v="${a.id}">Elimina</button>`}</div></div>`}).join(''):'<p class="empty">Ancora nessuna risposta. Chi è in zona riceve un avviso.</p>'}
     <label for="ansText">Rispondi ${d!=null?'(sei a '+fmtD(d)+')':''}</label>
     <textarea id="ansText" maxlength="280" placeholder="Scrivi cosa vedi da lì">${esc(draft)}</textarea>
-    ${inside?'':'<div class="warn">Sei fuori dalla zona: nell\'app vera la tua risposta non avrebbe il bollino “Era lì”. Con ⊕ puoi simulare di essere lì.</div>'}
+    ${inside?'':'<div class="warn">Sei fuori dalla zona: la tua risposta non avrà il bollino “Era lì”. Con ⊕ puoi simulare di essere lì.</div>'}
     <div class="btns"><button class="sec" data-close>Chiudi</button><button class="pri" data-act="sendAns" data-id="${p.id}">Invia risposta</button></div>`,'thread');
   openId=id;
 }
@@ -526,25 +628,6 @@ function openSearch(){
   $('#q').oninput=draw;draw();setTimeout(()=>$('#q').focus(),60);
 }
 
-/* ---------- risposta simulata (per sentire l'app "viva") ---------- */
-function simulateReply(id){
-  setTimeout(()=>{
-    const p=db.posts.find(x=>x.id===id);if(!p||p.exp<now())return;
-    const t=p.text.toLowerCase(),ids=Object.keys(U),by=ids[Math.floor(Math.random()*ids.length)];
-    const text=/cod|traffic|fila|barrier/.test(t)?'Sono qui vicino: lavori stradali al semaforo, si passa a senso alternato. Ci vogliono 5-10 minuti.'
-      :/gente|folla|pien|affoll/.test(t)?'C\'è un evento qui vicino, finisce tra un\'ora circa. Dopo dovrebbe svuotarsi.'
-      :/apert|chius|orari/.test(t)?'Ci sono passato 10 minuti fa: aperto.'
-      :/parchegg/.test(t)?'Qualche posto libero nelle vie laterali, il parcheggio principale è pieno.'
-      :/treno|bus|metro|district|stazion/.test(t)?'Treni regolari adesso, qualche minuto di ritardo prima.'
-      :'Sono qui vicino: al momento tutto tranquillo.';
-    const d=Math.round(40+Math.random()*Math.min(p.radius,600));
-    p.answers.push({id:uid(),by,text,t:now(),d,votes:0,voted:false,best:false,sim:true});
-    db.notifs.push({id:uid(),text:`${U[by].n} ha risposto: “${p.text.slice(0,50)}”`,t:now(),read:false,post:p.id});
-    save();toast(`Nuova risposta da ${U[by].n}`);
-    if(modalKind==='thread'&&openId===id)openThread(id);render();
-  },6000+Math.random()*5000);
-}
-
 /* ---------- azioni ---------- */
 const actions={
   thread:id=>openThread(id),place:id=>openPlace(id),group:id=>openGroup(id),
@@ -558,22 +641,25 @@ const actions={
   tab:id=>{closeModal();setTab(id)},
   feedF:id=>{feedF=id;render()},feedCat:id=>{feedCat=id;render()},
   readAll:()=>{db.notifs.forEach(n=>n.read=true);save();render()},
-  report:(id,v)=>{const pl=db.places.find(x=>x.id===id);pl.reports.push({type:v,t:now()});save();toast('Grazie! Segnalazione “'+REP[v].l+'” aggiunta');openPlace(id);render()},
-  voteP:id=>{const p=db.posts.find(x=>x.id===id);p.voted=!p.voted;p.votes+=p.voted?1:-1;save();openThread(id);render()},
-  voteA:(id,v)=>{const p=db.posts.find(x=>x.id===id),a=p.answers.find(x=>x.id===v);a.voted=!a.voted;a.votes+=a.voted?1:-1;save();openThread(id)},
-  best:(id,v)=>{const p=db.posts.find(x=>x.id===id);p.answers.forEach(a=>a.best=a.id===v);save();toast('Risposta migliore segnata: +15 punti a chi ha risposto');openThread(id)},
-  follow:id=>{const p=db.posts.find(x=>x.id===id);p.follow=!p.follow;save();toast(p.follow?'Ricevi un avviso per ogni nuova risposta':'Non segui più');openThread(id)},
+  report:async(id,v)=>{if(await run(sb.from('place_reports').insert({place_id:id,status:v,author_id:myId}),'Grazie! Segnalazione “'+REP[v].l+'” salvata'))openPlace(id)},
+  voteP:async id=>{const p=db.posts.find(x=>x.id===id);
+    if(await run(p.voted?sb.from('votes').delete().eq('post_id',id).eq('user_id',myId):sb.from('votes').insert({post_id:id,user_id:myId})))openThread(id)},
+  voteA:async(id,v)=>{const p=db.posts.find(x=>x.id===id),a=p.answers.find(x=>x.id===v);
+    if(await run(a.voted?sb.from('votes').delete().eq('answer_id',v).eq('user_id',myId):sb.from('votes').insert({answer_id:v,user_id:myId})))openThread(id)},
+  best:async(id,v)=>{if(await run(sb.rpc('set_best_answer',{p_post_id:id,p_answer_id:v}),'Risposta migliore segnata: +15 punti a chi ha risposto'))openThread(id)},
+  follow:id=>{const p=db.posts.find(x=>x.id===id);p.follow=!p.follow;db.follow=p.follow?[...new Set([...db.follow,id])]:db.follow.filter(x=>x!==id);save();toast(p.follow?'Ricevi un avviso per ogni nuova risposta':'Non segui più');openThread(id)},
   flag:by=>openModal(`<h3>Segnala ${esc(user(by).n)}</h3><p class="meta">Nell'app vera la segnalazione va ai moderatori. Obbligatorio per l'App Store.</p>
     ${['Informazione falsa','Spam o pubblicità','Offensivo','Rivela dove si trova una persona'].map(r=>`<div class="row" data-act="flagged" data-id="${by}" style="cursor:pointer"><div>${r}</div></div>`).join('')}
     <div class="row" data-act="block" data-id="${by}" style="cursor:pointer"><div class="red"><b>Blocca questo utente</b></div></div>
     <div class="btns"><button class="sec" data-close>Annulla</button></div>`),
   flagged:()=>{closeModal();toast('Segnalazione inviata (demo)')},
-  block:by=>{db.blocked=db.blocked||[];if(!db.blocked.includes(by))db.blocked.push(by);save();closeModal();toast(user(by).n+' bloccato (demo)')},
-  del:id=>{db.posts=db.posts.filter(x=>x.id!==id);save();closeModal();render();toast('Eliminata')},
-  sendAns:id=>{const t=$('#ansText').value.trim();if(!t)return;const p=db.posts.find(x=>x.id===id);
-    p.answers.push({id:uid(),by:'me',text:t,t:now(),d:me?Math.round(dist(me,p)):0,votes:0,voted:false,best:false});
-    $('#ansText').value='';save();toast('Risposta inviata: +10 punti');openThread(id);render();
-    if(p.by!=='me')setTimeout(()=>{const a=p.answers.find(x=>x.by==='me'&&!x.voted&&x.votes===0);if(a){a.votes++;db.notifs.push({id:uid(),text:`${user(p.by).n} ha trovato utile la tua risposta`,t:now(),read:false,post:p.id});save();render()}},9000)},
+  block:by=>{const n=user(by).n;if(!db.blocked.includes(by))db.blocked.push(by);save();closeModal();toast(n+' bloccato su questo telefono');reloadSoon()},
+  del:async id=>{closeModal();await run(sb.from('posts').delete().eq('id',id),'Eliminata')},
+  delA:async(id,v)=>{if(await run(sb.from('answers').delete().eq('id',v),'Risposta eliminata'))openThread(id)},
+  sendAns:async(id,_,btn)=>{const ta=$('#ansText'),t=ta.value.trim();if(!t)return;if(btn){btn.disabled=true;btn.textContent='Invio…'}
+    const ok=await run(sb.rpc('add_answer',{p_post_id:id,p_body:t,p_lat:me?me.lat:null,p_lng:me?me.lng:null}),'Risposta salvata: +10 punti');
+    if(ok){ta.value='';openThread(id)}else if(btn){btn.disabled=false;btn.textContent='Invia risposta'}},
+  logout:async()=>{await sb.auth.signOut();location.replace(APP_URL)},
   join:id=>{const g=db.groups.find(x=>x.id===id);g.joined=!g.joined;save();toast(g.joined?'Ti sei unito a '+g.name:'Sei uscito dal gruppo');openGroup(id);render()},
   gPost:id=>{const t=$('#gText').value.trim();if(!t)return;const g=db.groups.find(x=>x.id===id);g.posts.push({id:uid(),by:'me',text:t,t:now(),replies:0});save();openGroup(id)},
   fAccept:k=>{db.friends[k]='friend';save();toast('Ora tu e '+U[k].n+' siete amici');render()},
@@ -587,7 +673,7 @@ const actions={
   areaAdd:()=>{const n=placeLabel.split(' · ').pop()||'Zona attuale';if(!db.me.areas.includes(n))db.me.areas.push(n);save();render();toast('Segui '+n)},
   reset:()=>openModal(`<h3>Ripristinare la demo?</h3><p class="meta">Cancella domande, risposte, amici e impostazioni salvati su questo telefono.</p>
     <div class="btns"><button class="sec" data-close>Annulla</button><button class="pri" data-act="resetOk">Ripristina</button></div>`),
-  resetOk:()=>{db=seed();save();closeModal();render();toast('Demo ripristinata')}
+  resetOk:()=>{const{places,posts}=db;db=seed();db.places=places;db.posts=posts;db.me.name=(PROF[myId]||{}).n||'';save();closeModal();reloadSoon();toast('Demo locale ripristinata')}
 };
 document.addEventListener('click',e=>{
   const tb=e.target.closest('[data-tab]');if(tb){setTab(tb.dataset.tab);return}
@@ -595,12 +681,48 @@ document.addEventListener('click',e=>{
   const sg=e.target.closest('[data-name] [data-v]');if(sg&&sg.type==='button'){sg.parentElement.querySelectorAll('[data-v]').forEach(x=>x.classList.toggle('on',x===sg));return}
   const nr=e.target.closest('[data-n]');if(nr){const n=db.notifs.find(x=>x.id===nr.dataset.n);if(n&&!n.read){n.read=true;save();render()}}
   const a=e.target.closest('[data-act]');if(!a)return;e.preventDefault();
-  const f=actions[a.dataset.act];if(f)f(a.dataset.id,a.dataset.v);
+  const f=actions[a.dataset.act];if(f)f(a.dataset.id,a.dataset.v,a);
 });
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal()});
 
-setInterval(()=>{render();if(modalKind==='thread'&&openId&&!$('#ansText').value)openThread(openId)},60000);
+setInterval(()=>{if(!myId)return;render();if(modalKind==='thread'&&openId&&!$('#ansText').value)openThread(openId)},60000);
 render();
+
+/* ---------- accesso ---------- */
+let signup=false,entered=false,recovering=/type=recovery/.test(location.hash);
+const aMsg=(t,k)=>{const e=$('#aMsg');e.textContent=t||'';e.className='amsg '+(k||'')};
+const showAuth=view=>{$('#auth').classList.remove('hide');['aMain','aNewPass','aDenied'].forEach(x=>$('#'+x).classList.toggle('hide',x!==view))};
+const itErr=m=>/Invalid login/i.test(m)?'Email o password non corretti.':/Email not confirmed/i.test(m)?'Conferma prima l\'email: controlla la posta (anche lo spam).':/already registered/i.test(m)?'Questa email ha già un account: accedi.':/rate limit/i.test(m)?'Troppi tentativi: riprova tra qualche minuto.':/provider is not enabled/i.test(m)?'L\'accesso con Google non è ancora attivo: usa email e password.':m;
+async function enter(session){
+  if(recovering){showAuth('aNewPass');return}
+  if(entered)return;entered=true;
+  myId=session.user.id;myEmail=session.user.email||'';
+  const{data:ok,error}=await sb.rpc('is_member');
+  if(error||!ok){entered=false;$('#aWho').textContent=myEmail;showAuth('aDenied');if(error)aMsg(error.message,'err');return}
+  $('#auth').classList.add('hide');
+  if(await load()){subscribe();render();toast('Ciao '+(db.me.name||'')+'!')}
+}
+$('#aSwitch').onclick=()=>{signup=!signup;$('#aSubmit').textContent=signup?'Crea l\'account':'Accedi';
+  $('#aSwitch').textContent=signup?'Hai già un account? Accedi':'Prima volta? Crea l\'account';
+  $('#aPass').autocomplete=signup?'new-password':'current-password';aMsg('')};
+$('#aForm').onsubmit=async e=>{e.preventDefault();const email=$('#aEmail').value.trim(),password=$('#aPass').value,b=$('#aSubmit');
+  b.disabled=true;aMsg(signup?'Creo l\'account…':'Accedo…');
+  const r=signup?await sb.auth.signUp({email,password,options:{emailRedirectTo:APP_URL}}):await sb.auth.signInWithPassword({email,password});
+  b.disabled=false;
+  if(r.error){aMsg(itErr(r.error.message),'err');return}
+  if(signup&&!r.data.session){aMsg('Fatto! Ti ho mandato un\'email: apri il link per confermare, poi accedi.','ok');return}
+  aMsg('');enter(r.data.session)};
+$('#aGoogle').onclick=async()=>{aMsg('Apro Google…');const{error}=await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:APP_URL}});if(error)aMsg(itErr(error.message),'err')};
+$('#aForgot').onclick=async()=>{const email=$('#aEmail').value.trim();if(!email){aMsg('Scrivi prima la tua email qui sopra.','err');return}
+  const{error}=await sb.auth.resetPasswordForEmail(email,{redirectTo:APP_URL});aMsg(error?itErr(error.message):'Ti ho mandato un\'email per scegliere una nuova password.',error?'err':'ok')};
+$('#aNewPass').onsubmit=async e=>{e.preventDefault();const{data,error}=await sb.auth.updateUser({password:$('#aPass2').value});
+  if(error){aMsg(itErr(error.message),'err');return}recovering=false;aMsg('Password aggiornata ✓','ok');const{data:{session}}=await sb.auth.getSession();if(session)enter(session)};
+$('#aOut').onclick=async()=>{await sb.auth.signOut();location.replace(APP_URL)};
+sb.auth.onAuthStateChange((ev,session)=>{
+  if(ev==='PASSWORD_RECOVERY'){recovering=true;showAuth('aNewPass');return}
+  if(ev==='SIGNED_IN'&&session)setTimeout(()=>enter(session),0);
+});
+(async()=>{const{data:{session}}=await sb.auth.getSession();if(session)enter(session);else showAuth('aMain')})();
 }
 </script>
 </body>
