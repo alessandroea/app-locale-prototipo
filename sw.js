@@ -1,4 +1,4 @@
-// App Locale – V05 – service worker: riceve le notifiche push e apre l'app al tocco
+// App Locale – V06 – service worker: riceve le notifiche push e apre l'app al tocco
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', e => e.waitUntil(self.clients.claim()));
 
@@ -9,8 +9,8 @@ self.addEventListener('push', e => {
     await self.registration.showNotification(d.title || 'App Locale', {
       body: d.body || 'Nuovo avviso',
       tag: d.tag,
-      icon: 'icon-192.png',
-      badge: 'icon-192.png',
+      icon: 'icon-v6-192.png',
+      badge: 'icon-v6-192.png',
       data: { url: d.url || './' }
     });
     if (typeof d.badge === 'number' && self.navigator.setAppBadge) {

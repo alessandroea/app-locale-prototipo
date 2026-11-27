@@ -2,14 +2,17 @@
 
 Prototipo web dell'app basata sulla posizione di Alessandro e Giovanni.
 
-**Ultima: V05**
-- Ricerca dei posti in tutto il mondo (OpenStreetMap): cerchi "Bergamo" o "Trescore Balneario" e puoi fare una domanda su quel posto anche se non sei lì.
-- Amicizie salvate nel database: richiesta, accetta, rimuovi; filtro "Amici" nel feed.
-- Avvisi salvati nel database (sezione Attività): risposte alle tue domande, risposte dove hai risposto anche tu, nuove domande, risposta migliore, amicizie.
-- Notifiche push sul telefono (anche ad app chiusa). Su iPhone: Condividi → "Aggiungi alla schermata Home", apri l'app dall'icona, accedi, Profilo → Notifiche sul telefono → Attiva.
+**Ultima: V06**
+- Nuova grafica: mappa a tutto schermo, barra di ricerca, pin "a segnale" colorati per urgenza che pulsano quando la notizia è fresca, tema scuro automatico, barra laterale su computer e iPad.
+- Foto profilo (ritagliata e ridotta prima del caricamento) e nome modificabile.
+- "Confermo" e "Risolto" su domande e notizie, con avviso a chi le ha pubblicate; un post è risolto se lo dice l'autore o almeno due persone.
+- Urgenza dalla categoria: rosso emergenza, giallo viabilità e servizi, verde vita locale; filtro "Urgenti" nel feed.
+- Scadenza fino a 48 ore; nuova icona dell'app.
+
+V05: ricerca dei posti nel mondo, amicizie, avvisi e notifiche push (su iPhone: Condividi → "Aggiungi alla schermata Home", poi Profilo → Notifiche sul telefono → Attiva).
 
 Prova: https://alessandroea.github.io/app-locale-prototipo/
-Versioni precedenti: [/v04/](https://alessandroea.github.io/app-locale-prototipo/v04/) · [/v03/](https://alessandroea.github.io/app-locale-prototipo/v03/)
+Versioni precedenti: [/v05/](https://alessandroea.github.io/app-locale-prototipo/v05/) · [/v04/](https://alessandroea.github.io/app-locale-prototipo/v04/) · [/v03/](https://alessandroea.github.io/app-locale-prototipo/v03/)
 
 ## Database (Supabase)
 
@@ -17,6 +20,7 @@ Versioni precedenti: [/v04/](https://alessandroea.github.io/app-locale-prototipo
 - `supabase/01_schema.sql`: tabelle, PostGIS, regole di accesso (RLS) e funzioni.
 - `supabase/02_seed_demo.sql`: membri ammessi e dati di esempio di V03 (Richmond).
 - `supabase/03_v05_amici_notifiche.sql`: amicizie, avvisi, telefoni per le push, trigger.
+- `supabase/04_v06_foto_conferme.sql`: foto profilo (bucket avatars), Confermo/Risolto, avvisi relativi.
 - `supabase/functions/send-push`: funzione che manda le notifiche push; le chiavi VAPID sono nel Vault di Supabase.
 - Possono entrare solo le email nella tabella `members`. Per aggiungere una persona:
   `insert into public.members (email, name, color) values ('email@esempio.com', 'Nome', '#8e4ec6');`

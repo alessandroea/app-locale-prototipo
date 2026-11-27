@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#4C6BFF"/>
+      <stop offset="1" stop-color="#1A2A9C"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.62" r="0.5">
+      <stop offset="0" stop-color="#7FA0FF" stop-opacity=".55"/>
+      <stop offset="1" stop-color="#7FA0FF" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1024" height="1024" fill="url(#bg)"/>
+  <circle cx="512" cy="600" r="420" fill="url(#glow)"/>
+  <!-- onde del segnale -->
+  <g fill="none" stroke="#fff" stroke-linecap="round">
+    <path d="M296 330a300 300 0 0 1 432 0" stroke-width="44" opacity=".38"/>
+    <path d="M364 400a204 204 0 0 1 296 0" stroke-width="44" opacity=".7"/>
+  </g>
+  <!-- pin a forma di fumetto -->
+  <path d="M512 452c-104 0-188 80-188 180 0 120 150 238 177 258a18 18 0 0 0 22 0c27-20 177-138 177-258 0-100-84-180-188-180z" fill="#fff"/>
+  <circle cx="512" cy="630" r="62" fill="#2C40D6"/>
+  <circle cx="512" cy="630" r="24" fill="#FFB020"/>
+</svg>
