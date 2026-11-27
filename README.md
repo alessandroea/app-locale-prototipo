@@ -2,7 +2,13 @@
 
 Prototipo web dell'app basata sulla posizione di Alessandro e Giovanni.
 
-**Ultima: V08**
+**Ultima: V09**
+- Posizione per gli amici accesa di default (è il senso dell'app): si spegne in un tocco da Profilo → "Posizione per gli amici", e al benvenuto c'è già l'interruttore. Precisione esatta o zona ~1 km. Si aggiorna da sola mentre l'app è aperta.
+- Foto nelle domande e notizie (ridotta a 1280 px prima del caricamento, bucket `post-photos`).
+- Pulsante "Condividi" in ogni conversazione: link che apre direttamente quella domanda.
+- Filtri rapidi sulla mappa: Tutto, Urgenti, Amici.
+
+V08:
 - Profilo di ogni persona apribile toccando foto o nome (statistiche, amicizia, domande attive).
 - Posizione condivisa con gli amici: solo se la attivi tu, solo con gli amici, con precisione (esatta o zona ~1 km) e durata (1 ora, 8 ore, finché la spegni). Pin degli amici sulla mappa e fila "Amici sulla mappa"; live se aggiornata negli ultimi 5 minuti, altrimenti ultima posizione.
 - Usabilità: pannello in basso che scorre tutto insieme e si allarga, risposta fissa in fondo alla conversazione, ricerca delle persone.
@@ -22,7 +28,7 @@ V06:
 V05: ricerca dei posti nel mondo, amicizie, avvisi e notifiche push (su iPhone: Condividi → "Aggiungi alla schermata Home", poi Profilo → Notifiche sul telefono → Attiva).
 
 Prova: https://alessandroea.github.io/app-locale-prototipo/
-Versioni precedenti: [/v07/](https://alessandroea.github.io/app-locale-prototipo/v07/) · [/v06/](https://alessandroea.github.io/app-locale-prototipo/v06/) · [/v05/](https://alessandroea.github.io/app-locale-prototipo/v05/) · [/v04/](https://alessandroea.github.io/app-locale-prototipo/v04/) · [/v03/](https://alessandroea.github.io/app-locale-prototipo/v03/)
+Versioni precedenti: [/v08/](https://alessandroea.github.io/app-locale-prototipo/v08/) · [/v07/](https://alessandroea.github.io/app-locale-prototipo/v07/) · [/v06/](https://alessandroea.github.io/app-locale-prototipo/v06/) · [/v05/](https://alessandroea.github.io/app-locale-prototipo/v05/) · [/v04/](https://alessandroea.github.io/app-locale-prototipo/v04/) · [/v03/](https://alessandroea.github.io/app-locale-prototipo/v03/)
 
 ## Database (Supabase)
 
@@ -34,6 +40,8 @@ Versioni precedenti: [/v07/](https://alessandroea.github.io/app-locale-prototipo
 - `supabase/05_registrazione_aperta.sql`: registrazione aperta con interruttore.
 - `supabase/06_v07_nome_utente.sql`: nome utente unico.
 - `supabase/07_v08_posizione_amici.sql`: posizione condivisa solo con gli amici, statistiche del profilo.
+- `supabase/08_v09_posizione_default.sql`: posizione per gli amici accesa di default, spegnibile dal profilo.
+- `supabase/09_v09_foto_post.sql`: foto nelle domande e notizie (bucket `post-photos`).
 - `supabase/functions/send-push`: funzione che manda le notifiche push; le chiavi VAPID sono nel Vault di Supabase.
 - Possono entrare solo le email nella tabella `members`. Per aggiungere una persona:
   `insert into public.members (email, name, color) values ('email@esempio.com', 'Nome', '#8e4ec6');`

@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#F3F5F9" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0C1424" media="(prefers-color-scheme: dark)">
-<title>App Locale – V08</title>
+<title>App Locale – V09</title>
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-v6-180.png">
 <link rel="icon" type="image/png" href="icon-v6-192.png">
@@ -18,7 +18,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,650;12..96,800&display=swap">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>
-/* V08 prototipo – App Locale (Alessandro & Giovanni). V08: profilo delle persone, posizione condivisa con gli amici (solo se attivata), usabilità.
+/* V08 prototipo – App Locale (Alessandro & Giovanni). V09: posizione per gli amici attiva di default, si spegne dal Profilo.
    Nuova grafica: mappa a tutto schermo, pin "a segnale" colorati per urgenza, tema chiaro/scuro,
    barra laterale su computer e iPad. Dati su Supabase (accesso, post, risposte, voti, conferme,
    amicizie, avvisi, foto profilo). Gruppi e impostazioni restano demo su questo telefono. */
@@ -63,7 +63,7 @@ a{color:var(--cobalt)}
 .round.on{background:var(--cobalt);color:var(--on-cobalt)}
 .topav{width:52px;height:52px;padding:0;border-radius:50%;flex:none;box-shadow:var(--shadow);display:grid;place-items:center;background:var(--surface)}
 .topav .av{width:46px;height:46px;font-size:16px}
-.sim{position:fixed;z-index:10;left:calc(50% + var(--rail)/2);transform:translateX(-50%);top:calc(env(safe-area-inset-top) + 72px);background:var(--cobalt);color:var(--on-cobalt);font-size:13px;font-weight:600;padding:7px 14px;border-radius:99px;white-space:nowrap}
+.sim{position:fixed;z-index:10;left:calc(50% + var(--rail)/2);transform:translateX(-50%);top:calc(env(safe-area-inset-top) + 118px);background:var(--cobalt);color:var(--on-cobalt);font-size:13px;font-weight:600;padding:7px 14px;border-radius:99px;white-space:nowrap}
 
 /* ---------- pannello "intorno a te" ---------- */
 .sheet{position:fixed;z-index:10;left:0;right:0;bottom:calc(var(--tab) + env(safe-area-inset-bottom));background:var(--surface);border-radius:28px 28px 0 0;box-shadow:0 -10px 40px -20px rgba(15,27,51,.5);padding:6px 16px 12px;max-height:46vh;display:flex;flex-direction:column}
@@ -179,11 +179,11 @@ label{display:block;font-size:13px;font-weight:600;color:var(--mute);margin:16px
 .rep button{background:var(--surface2);font-size:14px;min-height:44px;display:flex;align-items:center;justify-content:center;gap:6px;padding:0 6px}
 .kv{display:grid;grid-template-columns:7.5em 1fr;gap:6px 12px;font-size:14px;margin-top:10px}
 .kv dt{color:var(--mute)}.kv dd{margin:0}
-.toast{position:fixed;z-index:30;left:calc(50% + var(--rail)/2);top:calc(env(safe-area-inset-top) + 74px);transform:translateX(-50%) translateY(-8px);background:var(--ink);color:var(--paper);padding:11px 18px;border-radius:99px;font-size:14px;font-weight:500;opacity:0;transition:opacity .2s,transform .2s;pointer-events:none;max-width:92vw;text-align:center;box-shadow:var(--shadow)}
+.toast{position:fixed;z-index:30;left:calc(50% + var(--rail)/2);top:calc(env(safe-area-inset-top) + 120px);transform:translateX(-50%) translateY(-8px);background:var(--ink);color:var(--paper);padding:11px 18px;border-radius:99px;font-size:14px;font-weight:500;opacity:0;transition:opacity .2s,transform .2s;pointer-events:none;max-width:92vw;text-align:center;box-shadow:var(--shadow)}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 .demo{font-size:12px;color:var(--mute);text-align:center;margin:16px 0 4px}
 .empty{color:var(--mute);padding:16px 0;font-size:15px}
-.loading{position:fixed;z-index:11;left:calc(50% + var(--rail)/2);transform:translateX(-50%);top:calc(env(safe-area-inset-top) + 72px);background:var(--surface);color:var(--ink);font-size:13px;font-weight:600;padding:7px 14px;border-radius:99px;box-shadow:var(--shadow)}
+.loading{position:fixed;z-index:11;left:calc(50% + var(--rail)/2);transform:translateX(-50%);top:calc(env(safe-area-inset-top) + 120px);background:var(--surface);color:var(--ink);font-size:13px;font-weight:600;padding:7px 14px;border-radius:99px;box-shadow:var(--shadow)}
 
 /* ---------- segni sulla mappa ---------- */
 .me-pin{width:20px;height:20px;border-radius:50%;background:var(--cobalt);border:3px solid #fff;box-shadow:0 0 0 7px color-mix(in srgb,var(--cobalt) 22%,transparent)}
@@ -236,6 +236,15 @@ label{display:block;font-size:13px;font-weight:600;color:var(--mute);margin:16px
 .composer textarea{min-height:64px}
 .composer .btns{margin-top:10px}
 .qbox{margin:0 0 8px}
+/* V09 */
+.mapf{position:fixed;z-index:9;left:calc(var(--rail) + 12px);top:calc(env(safe-area-inset-top) + 72px);display:flex;gap:6px}
+.mapf .chip{box-shadow:0 4px 14px -4px rgba(15,27,51,.35);border:0;min-height:36px;font-weight:600}
+.pimg{display:block;width:100%;aspect-ratio:16/10;object-fit:cover;border-radius:14px;margin:2px 0 10px;background:var(--surface2)}
+.timg{display:block;width:100%;max-height:60vh;object-fit:cover;border-radius:16px;margin:10px 0 4px;background:var(--surface2)}
+.photo-pick{display:flex;align-items:center;gap:10px;margin-top:10px}
+.photo-pick label{margin:0;display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:0 14px;border-radius:12px;background:var(--surface2);color:var(--ink);font-size:14px;font-weight:600;cursor:pointer}
+.photo-pick img{width:56px;height:56px;border-radius:12px;object-fit:cover}
+.photo-pick button{min-height:36px;padding:0 10px;font-size:13px;color:var(--alert)}
 .setup-av{margin:18px 0 2px}
 .at{position:relative}.at span{position:absolute;left:15px;top:50%;transform:translateY(-50%);color:var(--mute);font-weight:650;pointer-events:none}
 .at input{padding-left:32px;margin-top:0}
@@ -273,6 +282,7 @@ label{display:block;font-size:13px;font-weight:600;color:var(--mute);margin:16px
     <button class="round" id="btnSim" data-act="sim" aria-label="Modalità prova: tocca la mappa per spostarti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/><circle cx="12" cy="12" r="5"/></svg></button>
     <button class="topav" data-tab="me" id="topAv" aria-label="Il tuo profilo"></button>
   </div>
+  <div class="mapf" id="mapF" role="group" aria-label="Cosa mostrare sulla mappa"><button class="chip on" data-act="mapF" data-id="all">Tutto</button><button class="chip" data-act="mapF" data-id="urgent">Urgenti</button><button class="chip" data-act="mapF" data-id="friends">Amici</button></div>
   <div class="sim hide" id="simBadge">Modalità prova: tocca la mappa per spostarti</div>
   <section class="sheet" id="sheet" aria-label="Intorno a te">
     <button class="grab" data-act="sheet" aria-label="Riduci o espandi il pannello"></button>
@@ -332,6 +342,7 @@ label{display:block;font-size:13px;font-weight:600;color:var(--mute);margin:16px
       <label for="sUser">Nome utente</label>
       <div class="at"><span>@</span><input id="sUser" maxlength="20" autocapitalize="none" autocorrect="off" spellcheck="false" inputmode="email" required></div>
       <p class="umsg" id="sUserMsg">Da 3 a 20 caratteri: lettere minuscole, numeri, punto e trattino basso.</p>
+      <div class="row" style="margin-top:14px;border:0;padding:0"><div><b>Mostra la mia posizione agli amici</b><div class="meta">Solo i tuoi amici ti vedono sulla mappa. Puoi spegnerla quando vuoi.</div></div><button type="button" class="sw on" id="sShare" role="switch" aria-checked="true" aria-label="Mostra la mia posizione agli amici"></button></div>
       <button class="pri big" id="sSave">Entra nell'app</button>
     </form>
     <form id="aNewPass" class="hide">
@@ -345,7 +356,7 @@ label{display:block;font-size:13px;font-weight:600;color:var(--mute);margin:16px
       <button class="sec big" id="aOut" type="button">Esci</button>
     </div>
     <p class="amsg" id="aMsg" role="status"></p>
-    <p class="demo">Prototipo V08</p>
+    <p class="demo">Prototipo V09</p>
   </div>
 </div>
 
@@ -430,10 +441,10 @@ async function load(){
   const [pl,rp,po,an,vo,pr,fr,nt,rx,lc]=await Promise.all([
     sb.from('places').select('id,name,category,lat,lng,info'),
     sb.from('place_reports').select('place_id,status,is_demo,demo_offset_min,created_at').or(`is_demo.eq.true,created_at.gt.${since}`),
-    sb.from('posts').select('id,kind,category,place_id,place_label,lat,lng,radius_m,body,author_id,demo_author,is_demo,demo_offset_min,base_votes,base_confirms,best_answer_id,created_at,expires_at').or(`is_demo.eq.true,expires_at.gt.${since}`),
+    sb.from('posts').select('id,kind,category,place_id,place_label,lat,lng,radius_m,body,author_id,demo_author,is_demo,demo_offset_min,base_votes,base_confirms,best_answer_id,created_at,expires_at,photo_url').or(`is_demo.eq.true,expires_at.gt.${since}`),
     sb.from('answers').select('id,post_id,body,distance_m,author_id,demo_author,is_demo,demo_offset_min,base_votes,created_at'),
     sb.from('votes').select('user_id,post_id,answer_id'),
-    sb.from('profiles').select('id,display_name,color,avatar_url,username'),
+    sb.from('profiles').select('id,display_name,color,avatar_url,username,share_location,share_precision'),
     sb.from('friendships').select('id,requester_id,addressee_id,status'),
     sb.from('notifications').select('id,kind,post_id,body,read_at,created_at').order('created_at',{ascending:false}).limit(100),
     sb.from('post_reactions').select('post_id,user_id,kind'),
@@ -442,7 +453,7 @@ async function load(){
   $('#loading').classList.add('hide');
   const err=[pl,rp,po,an,vo,pr,fr,nt,rx,lc].find(r=>r.error);
   if(err){toast('Errore dal database: '+err.error.message);return false}
-  PROF={};pr.data.forEach(p=>PROF[p.id]={n:p.display_name,c:p.color,a:p.avatar_url,u:p.username});
+  PROF={};pr.data.forEach(p=>PROF[p.id]={n:p.display_name,c:p.color,a:p.avatar_url,u:p.username,sh:p.share_location!==false,sp:p.share_precision||'exact'});
   if(PROF[myId]){db.me.name=PROF[myId].n}
   LOC={};lc.data.forEach(l=>{const until=l.share_until?Date.parse(l.share_until):null;LOC[l.user_id]={lat:l.lat,lng:l.lng,acc:l.accuracy_m,area:l.precision==='area',until,t:Date.parse(l.updated_at)}});
   FR=fr.data.map(f=>({id:f.id,other:f.requester_id===myId?f.addressee_id:f.requester_id,status:f.status,incoming:f.addressee_id===myId}));
@@ -458,7 +469,7 @@ async function load(){
   const RX={};rx.data.forEach(r=>{const o=RX[r.post_id]||(RX[r.post_id]={confirm:new Set(),resolved:new Set()});o[r.kind].add(r.user_id)});
   db.posts=po.data.map(p=>{const t=T(p),dur=Date.parse(p.expires_at)-Date.parse(p.created_at),x=RX[p.id]||{confirm:new Set(),resolved:new Set()};
     return{id:p.id,type:p.kind,cat:p.category,placeId:p.place_id,lat:p.lat,lng:p.lng,place:p.place_label,by:who(p),mine:p.author_id===myId,
-      text:p.body,t,exp:p.is_demo?t+dur:Date.parse(p.expires_at),radius:p.radius_m,
+      text:p.body,photo:p.photo_url,t,exp:p.is_demo?t+dur:Date.parse(p.expires_at),radius:p.radius_m,
       confirms:(p.base_confirms||0)+x.confirm.size,myConfirm:x.confirm.has(myId),resolves:x.resolved.size,myResolve:x.resolved.has(myId),
       resolved:(p.author_id&&x.resolved.has(p.author_id))||x.resolved.size>=2,
       votes:p.base_votes+(vP[p.id]||0),voted:myP.has(p.id),follow:db.follow.includes(p.id)||p.author_id===myId,demo:p.is_demo,
@@ -517,16 +528,17 @@ const pushTxt=()=>({on:'Attive su questo telefono: ricevi un avviso anche ad app
   unsupported:'Questo browser non supporta le notifiche push'})[pushState];
 function clearBadge(){try{navigator.clearAppBadge&&navigator.clearAppBadge()}catch(e){}}
 
-/* ---------- posizione condivisa con gli amici (solo se attivata) ---------- */
-let myAcc=null,lastShare=null;
-const mySharing=()=>{const l=LOC[myId];return !!(l&&(!l.until||l.until>now()))};
+/* ---------- posizione per gli amici: attiva di default, si spegne dal Profilo ---------- */
+let myAcc=null,lastShare=null,geoDenied=false;
+const wantShare=()=>!!myId&&(PROF[myId]||{}).sh!==false;
+const mySharing=()=>{const l=LOC[myId];return wantShare()&&!!(l&&(!l.until||l.until>now()))};
 const isLive=l=>now()-l.t<5*M;
-function maybeShare(){
-  if(!myId||!me||!mySharing())return;
+function maybeShare(force){
+  if(!myId||!me||!wantShare())return;
   const moved=lastShare?dist(lastShare,me):1e9,age=lastShare?now()-lastShare.t:1e9;
-  if(moved<120&&age<60e3)return;
+  if(!force&&moved<120&&age<60e3)return;
   lastShare={lat:me.lat,lng:me.lng,t:now()};
-  sb.rpc('share_location',{p_lat:me.lat,p_lng:me.lng,p_accuracy:Math.round(myAcc||30),p_precision:LOC[myId].area?'area':'exact',p_hours:-1}).then(()=>{});
+  sb.rpc('share_location',{p_lat:me.lat,p_lng:me.lng,p_accuracy:Math.round(myAcc||30),p_precision:(PROF[myId]||{}).sp||'exact',p_hours:0}).then(()=>{});
 }
 setInterval(()=>{lastShare&&(lastShare.t=0);maybeShare()},120e3);
 const geoCache={};
@@ -552,6 +564,12 @@ function watchUser(input,msg){let t=null;
   input.addEventListener('input',()=>{const v=input.value.toLowerCase().replace(/[^a-z0-9._]/g,'');if(v!==input.value)input.value=v;
     clearTimeout(t);t=setTimeout(()=>checkUser(v,msg),450)})}
 
+async function fitJpeg(file,max=1280){
+  const img=await new Promise((ok,ko)=>{const i=new Image();i.onload=()=>ok(i);i.onerror=ko;i.src=URL.createObjectURL(file)});
+  const k=Math.min(1,max/Math.max(img.naturalWidth,img.naturalHeight)),c=document.createElement('canvas');
+  c.width=Math.round(img.naturalWidth*k);c.height=Math.round(img.naturalHeight*k);c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+  URL.revokeObjectURL(img.src);return new Promise(ok=>c.toBlob(ok,'image/jpeg',.82));
+}
 /* ---------- foto profilo: ritaglio quadrato 320 px, JPEG, nella cartella dell'utente ---------- */
 async function squareJpeg(file,size=320){
   const img=await new Promise((ok,ko)=>{const i=new Image();i.onload=()=>ok(i);i.onerror=ko;i.src=URL.createObjectURL(file)});
@@ -637,15 +655,18 @@ async function lookup(lat,lng){
   }catch(e){$('#placeName').textContent='Posizione attuale'}
 }
 if('geolocation' in navigator){
-  navigator.geolocation.watchPosition(p=>{gpsPos={lat:p.coords.latitude,lng:p.coords.longitude,acc:p.coords.accuracy};if(!simMode)setMe(gpsPos.lat,gpsPos.lng,gpsPos.acc)},
-    ()=>{$('#placeName').textContent='Posizione non disponibile';$('#placeSub').textContent='Usa ⊕ e tocca la mappa per scegliere dove sei'},
+  navigator.geolocation.watchPosition(p=>{geoDenied=false;gpsPos={lat:p.coords.latitude,lng:p.coords.longitude,acc:p.coords.accuracy};if(!simMode)setMe(gpsPos.lat,gpsPos.lng,gpsPos.acc)},
+    ()=>{geoDenied=true;$('#placeName').textContent='Posizione non disponibile';$('#placeSub').textContent='Usa ⊕ e tocca la mappa per scegliere dove sei'},
     {enableHighAccuracy:true,maximumAge:10000,timeout:15000});
 }
 map.on('click',e=>{if(simMode)setMe(e.latlng.lat,e.latlng.lng,15,true)});
 
+let mapF='all';
+const mapPass=p=>mapF==='all'||(mapF==='urgent'?(!p.resolved&&urgOf(p)!=='calm'):(p.by!=='me'&&isFriend(p.by)));
 function renderMap(){
   layer.clearLayers();
-  const live=alive();
+  document.querySelectorAll('#mapF .chip').forEach(c=>c.classList.toggle('on',c.dataset.id===mapF));
+  const live=alive().filter(mapPass);
   db.places.forEach(pl=>{
     const n=live.filter(p=>p.placeId===pl.id).length,s=status(pl);
     const ic=L.divIcon({className:'',html:`<div class="pl"><i style="background:${s?REP[s.type].c:'#9aa4af'}"></i>${esc(pl.name.split(' – ')[0])}${n?`<b>${n}</b>`:''}</div>`,iconSize:[0,0]});
@@ -658,7 +679,7 @@ function renderMap(){
     const ic=L.divIcon({className:'',html:`<div class="q-pin u-${u} ${fresh?'fresh':''} ${p.resolved?'res':''}">${p.resolved?'✓':p.type==='n'?'!':'?'}</div>`,iconSize:[36,36],iconAnchor:[18,18]});
     L.marker([p.lat,p.lng],{icon:ic}).on('click',()=>openThread(p.id)).addTo(layer);
   });
-  friendLocs().forEach(f=>{
+  (mapF==='urgent'?[]:friendLocs()).forEach(f=>{
     const live=isLive(f);
     if(f.area)L.circle([f.lat,f.lng],{radius:1000,color:'#1F9D63',weight:1,fillOpacity:.04,interactive:false}).addTo(layer);
     const ic=L.divIcon({className:'',html:`<div class="fpin ${live?'on':''}">${av(f.id)}<b>${esc(user(f.id).n.split(' ')[0])}, ${live?'ora':ago(f.t)}</b></div>`,iconSize:[0,0]});
@@ -674,7 +695,7 @@ function postCard(p,full){
   const u=user(p.by),n=p.answers.length;
   return`<button class="card ${p.resolved?'res':''}" data-act="thread" data-id="${esc(p.id)}">
     <div class="who"><span class="who" data-act="profile" data-id="${esc(p.by)}">${av(p.by)}<b>${esc(u.n)}</b></span></div><div class="meta" style="margin:2px 0 0 44px">${esc(p.place)}, ${ago(p.t)}</div>
-    <p class="ptxt">${esc(p.text)}</p>
+    <p class="ptxt">${esc(p.text)}</p>${p.photo?`<img class="pimg" src="${esc(p.photo)}" alt="Foto allegata" loading="lazy">`:''}
     <div class="facts">${typeTags(p)}<span>${n} rispost${n===1?'a':'e'}</span>${p.confirms?`<span>${p.confirms===1?'1 conferma':p.confirms+' confermano'}</span>`:''}${p.votes?`<span>${p.votes===1?'1 utile':p.votes+' utili'}</span>`:''}${p.d!=null?`<span>a ${fmtD(p.d)}</span>`:''}${full&&!p.resolved?`<span>scade tra ${left(p.exp)}</span>`:''}</div></button>`;
 }
 function renderMapUi(){
@@ -686,7 +707,7 @@ function renderMapUi(){
   $('#friendsBox').classList.toggle('hide',!fl.length);
   $('#fCount').textContent=fl.filter(isLive).length?fl.filter(isLive).length+' live':'';
   $('#friendsRow').innerHTML=fl.map(f=>`<button class="fchip" data-act="showFriend" data-id="${f.id}">${av(f.id)}<span><b>${esc(user(f.id).n)}</b><small>${f.d!=null?fmtD(f.d)+', ':''}${isLive(f)?'live':ago(f.t)}</small></span></button>`).join('');
-  const list=withD(alive()).sort((a,b)=>(a.d??0)-(b.d??0));
+  const list=withD(alive().filter(mapPass)).sort((a,b)=>(a.d??0)-(b.d??0));
   $('#count').textContent=list.length+' attive';
   $('#list').innerHTML=list.length?list.map(p=>postCard(p)).join('')+'<p class="demo">“Esempio” indica le conversazioni demo; le altre sono vostre.</p>':'<p class="empty">Qui intorno è tutto tranquillo. Fai tu la prima domanda.</p>';
 }
@@ -770,8 +791,9 @@ function renderMe(){
 
     <div class="sec-t">Posizione per gli amici</div>
     <div class="box2">
-      <div class="row"><span class="ldot ${mySharing()?'on':''}"></span><div><b>${mySharing()?'La stai condividendo':'Non la stai condividendo'}</b><div class="meta">${mySharing()?`Con ${FR.filter(f=>f.status==='accepted').length} amic${FR.filter(f=>f.status==='accepted').length===1?'o':'i'}, ${LOC[myId].area?'solo la zona (~1 km)':'posizione esatta'}, ${LOC[myId].until?'fino alle '+new Date(LOC[myId].until).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'}):'finché non la spegni'}. Si aggiorna mentre l'app è aperta; poi resta l'ultima.`:'Solo i tuoi amici possono vederla, e solo se la attivi tu. Nessun altro, mai.'}</div></div>
-      ${mySharing()?'<button class="small sec" data-act="shareStop">Smetti</button>':'<button class="small pri" data-act="shareStart">Attiva</button>'}</div>
+      <div class="row"><span class="ldot ${wantShare()&&me?'on':''}"></span><div><b>Mostra la mia posizione agli amici</b><div class="meta">${!wantShare()?'Spenta: i tuoi amici non vedono dove sei.':geoDenied?'Accesa, ma il telefono non dà la posizione all\'app: consentila in Impostazioni → Privacy → Localizzazione.':`La vedono solo i tuoi ${FR.filter(f=>f.status==='accepted').length} amic${FR.filter(f=>f.status==='accepted').length===1?'o':'i'}. Si aggiorna mentre l'app è aperta; quando la chiudi resta l'ultima.`}</div></div>
+      <button class="sw ${wantShare()?'on':''}" data-act="shareToggle" role="switch" aria-checked="${wantShare()}" aria-label="Mostra la mia posizione agli amici"></button></div>
+      ${wantShare()?`<div class="row" style="display:block"><b>Cosa vedono</b><div class="seg" style="margin-top:8px"><button class="${(PROF[myId]||{}).sp!=='area'?'on':''}" data-act="sharePrec" data-id="exact">Posizione esatta</button><button class="${(PROF[myId]||{}).sp==='area'?'on':''}" data-act="sharePrec" data-id="area">Solo la zona (~1 km)</button></div></div>`:''}
     </div>
     <div class="sec-t">Privacy</div>
     <div class="box2">
@@ -794,7 +816,7 @@ function renderMe(){
       <div class="row"><div><b>Utenti bloccati</b><div class="meta">${(db.blocked||[]).length} bloccati</div></div></div>
       <div class="row"><button class="small sec red" data-act="reset">Ripristina gruppi, amici e impostazioni demo</button></div>
     </div>
-    <p class="demo">Prototipo V08. Domande, risposte, voti, conferme, amicizie, avvisi e foto sono nel database; gruppi e impostazioni restano su questo telefono.</p>`;
+    <p class="demo">Prototipo V09. Domande, risposte, voti, conferme, amicizie, avvisi e foto sono nel database; gruppi e impostazioni restano su questo telefono.</p>`;
 }
 
 /* ---------- profilo di una persona ---------- */
@@ -862,6 +884,7 @@ function openAsk(placeId,text,sp){
     <form id="askForm">
     <div class="seg" data-name="type" style="margin-top:12px"><button type="button" class="on" data-v="q">Domanda</button><button type="button" data-v="n">Notizia</button></div>
     <textarea id="askText" maxlength="280" placeholder="Es. Perché c'è così tanta gente?" style="margin-top:10px" required>${esc(text||'')}</textarea>
+    <div class="photo-pick" id="photoPick"><label for="askPhoto"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>Aggiungi una foto</label><input type="file" id="askPhoto" accept="image/*" class="hide"></div>
     <label>Categoria</label>
     <div class="chips" data-name="cat" style="margin:0 -16px">${Object.entries(CATS).map(([k,l],i)=>`<button type="button" class="chip ${k==='info'?'on':''}" data-v="${k}">${k==='emergenza'?'🔴 ':''}${l}</button>`).join('')}</div>
     <label>Chi può rispondere</label>
@@ -870,12 +893,21 @@ function openAsk(placeId,text,sp){
     <div class="seg" data-name="exp"><button type="button" data-v="1">1 ora</button><button type="button" class="on" data-v="3">3 ore</button><button type="button" data-v="24">24 ore</button><button type="button" data-v="48">48 ore</button></div>
     <div class="meta" style="margin-top:10px">Pubblichi come <b>${esc(meU().n)}</b> · cambia in Profilo</div>
     <div class="btns"><button type="button" class="sec" data-close>Annulla</button><button class="pri">Pubblica</button></div></form>`,'ask');
-  const f=$('#askForm');
+  const f=$('#askForm');let photo=null;
+  const drawPick=()=>{$('#photoPick').innerHTML=photo?`<img src="${URL.createObjectURL(photo)}" alt="Anteprima"><span class="meta">Foto pronta</span><button type="button" id="photoDel">Togli</button>`
+      :'<label for="askPhoto"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>Aggiungi una foto</label>';
+    $('#photoPick').appendChild(inp);const d=$('#photoDel');if(d)d.onclick=()=>{photo=null;drawPick()}};
+  const inp=$('#askPhoto');
+  inp.onchange=async()=>{const file=inp.files[0];inp.value='';if(!file)return;try{photo=await fitJpeg(file,1280);drawPick()}catch(e){toast('Questa immagine non si apre, provane un\'altra')}};
   f.onsubmit=async e=>{e.preventDefault();const t=$('#askText').value.trim();if(!t)return;
     const v=n=>f.querySelector(`[data-name="${n}"] .on`).dataset.v;
-    const base=pl||sp||me,btn=f.querySelector('.pri');btn.disabled=true;btn.textContent='Salvo…';
+    const base=pl||sp||me,btn=f.querySelector('.pri');btn.disabled=true;btn.textContent=photo?'Carico la foto…':'Salvo…';
+    let photoUrl=null;
+    if(photo){const path=`${myId}/${Date.now()}.jpg`,up=await sb.storage.from('post-photos').upload(path,photo,{contentType:'image/jpeg',cacheControl:'31536000'});
+      if(up.error){toast('Foto non caricata: '+up.error.message);btn.disabled=false;btn.textContent='Pubblica';return}
+      photoUrl=sb.storage.from('post-photos').getPublicUrl(path).data.publicUrl;btn.textContent='Salvo…'}
     const id=await run(sb.rpc('create_post',{p_kind:v('type'),p_category:v('cat'),p_place_id:pl?pl.id:null,p_place_label:label,
-      p_lat:base.lat,p_lng:base.lng,p_radius_m:+v('radius'),p_hours:+v('exp'),p_body:t}),'Pubblicata ✓ salvata nel database');
+      p_lat:base.lat,p_lng:base.lng,p_radius_m:+v('radius'),p_hours:+v('exp'),p_body:t,p_photo_url:photoUrl}),'Pubblicata ✓');
     if(!id){btn.disabled=false;btn.textContent='Pubblica';return}
     if(!db.follow.includes(id))db.follow.push(id);save();openThread(id);
   };
@@ -889,11 +921,11 @@ function openThread(id){
   const draft=$('#ansText')&&openId===id?$('#ansText').value:'';
   openModal(`<div class="who" data-act="profile" data-id="${esc(p.by)}">${av(p.by)}<div><b>${esc(u.n)}</b><div class="meta">${ago(p.t)}, scade tra ${left(p.exp)}</div></div></div>
     <div class="facts" style="margin-top:12px">${typeTags(p)}</div>
-    <h3>${esc(p.text)}</h3>
+    <h3>${esc(p.text)}</h3>${p.photo?`<a href="${esc(p.photo)}" target="_blank" rel="noopener"><img class="timg" src="${esc(p.photo)}" alt="Foto allegata"></a>`:''}
     <div class="meta">📍 ${p.placeId?`<a href="#" data-act="place" data-id="${p.placeId}">${esc(p.place)}</a>`:esc(p.place)} · zona ${fmtD(p.radius)}</div>
     ${p.resolved?`<div class="resbar">✓ Risolto${p.resolves?`, lo dicono ${p.resolves} person${p.resolves===1?'a':'e'}`:''}</div>`:''}
     <div class="acts" style="margin-top:10px"><button class="ok ${p.myConfirm?'on':''}" data-act="react" data-id="${p.id}" data-v="confirm">✓ Confermo${p.confirms?' '+p.confirms:''}</button><button class="ok ${p.myResolve?'on':''}" data-act="react" data-id="${p.id}" data-v="resolved">Risolto${p.resolves?' '+p.resolves:''}</button></div>
-    <div class="acts"><button class="${p.voted?'on':''}" data-act="voteP" data-id="${p.id}">▲ Utile ${p.votes}</button><button class="${p.follow?'on':''}" data-act="follow" data-id="${p.id}">${p.follow?'Segui ✓':'Segui'}</button>${p.by!=='me'?`<button data-act="flag" data-id="${p.by}">Segnala</button>`:`<button class="red" data-act="del" data-id="${p.id}">Elimina</button>`}</div>
+    <div class="acts"><button class="${p.voted?'on':''}" data-act="voteP" data-id="${p.id}">▲ Utile ${p.votes}</button><button class="${p.follow?'on':''}" data-act="follow" data-id="${p.id}">${p.follow?'Segui ✓':'Segui'}</button><button data-act="share" data-id="${p.id}">Condividi</button>${p.by!=='me'?`<button data-act="flag" data-id="${p.by}">Segnala</button>`:`<button class="red" data-act="del" data-id="${p.id}">Elimina</button>`}</div>
     <label>${answers.length} rispost${answers.length===1?'a':'e'}</label>
     ${answers.length?answers.map(a=>{const au=user(a.by),near=a.d!=null&&a.d<=p.radius;return`<div class="ans ${a.best?'best':''}">
       <div class="who"><span class="who" data-act="profile" data-id="${esc(a.by)}">${av(a.by)}<b>${esc(au.n)}</b></span>${near?'<span class="near">Era lì</span>':''}${a.best?'<span class="near">Migliore</span>':''}</div>
@@ -1039,18 +1071,15 @@ const actions={
       if(await run(sb.from('profiles').update({display_name:v,username:u}).eq('id',myId),'Profilo salvato'))closeModal()};
     setTimeout(()=>$('#nameIn').select(),60)},
   profile:id=>openProfile(id),
+  mapF:id=>{mapF=id;renderMapUi();if(id==='friends'&&!friendLocs().length)toast('Nessun amico sta condividendo la posizione adesso')},
+  share:async id=>{const p=db.posts.find(x=>x.id===id);if(!p)return;const url=APP_URL+'#post='+id,text=(p.type==='n'?'Notizia':'Domanda')+' su '+p.place+': '+p.text;
+    try{if(navigator.share){await navigator.share({title:'App Locale',text,url});return}
+      await navigator.clipboard.writeText(text+'\n'+url);toast('Link copiato: incollalo dove vuoi')}catch(e){if(e&&e.name!=='AbortError')toast('Non riesco a condividere da qui')}},
   showFriend:id=>{const l=LOC[id];if(!l)return;closeModal();setTab('map');map.setView([l.lat,l.lng],l.area?14:16)},
-  shareStart:()=>{
-    if(!me){toast('Serve la tua posizione: consenti l\'accesso o usa ⊕ sulla mappa');return}
-    const nf=FR.filter(f=>f.status==='accepted').length;
-    openModal(`<h3>Condividi la posizione</h3><p class="meta">La vedranno solo i tuoi ${nf} amic${nf===1?'o':'i'}. Si aggiorna mentre l'app è aperta; quando la chiudi resta visibile l'ultima posizione, fino alla scadenza.</p>
-      <form id="shareForm"><label>Cosa vedono</label><div class="seg" data-name="prec"><button type="button" class="on" data-v="exact">Posizione esatta</button><button type="button" data-v="area">Solo la zona (~1 km)</button></div>
-      <label>Per quanto tempo</label><div class="seg" data-name="dur"><button type="button" class="on" data-v="1">1 ora</button><button type="button" data-v="8">8 ore</button><button type="button" data-v="0">Finché la spengo</button></div>
-      <div class="btns"><button type="button" class="sec" data-close>Annulla</button><button class="pri">Condividi</button></div></form>`,'share');
-    const f=$('#shareForm');f.onsubmit=async e=>{e.preventDefault();const v=n=>f.querySelector(`[data-name="${n}"] .on`).dataset.v;
-      lastShare={lat:me.lat,lng:me.lng,t:now()};
-      if(await run(sb.rpc('share_location',{p_lat:me.lat,p_lng:me.lng,p_accuracy:Math.round(myAcc||30),p_precision:v('prec'),p_hours:+v('dur')}),'Posizione condivisa con gli amici'))closeModal()}},
-  shareStop:async()=>{lastShare=null;await run(sb.rpc('stop_sharing_location'),'Non condividi più la posizione')},
+  shareToggle:async()=>{const on=!wantShare();
+    if(!(await run(sb.from('profiles').update({share_location:on}).eq('id',myId),on?'Posizione visibile agli amici':'Posizione spenta: gli amici non la vedono più')))return;
+    if(on){lastShare=null;maybeShare(true)}else{lastShare=null;await sb.rpc('stop_sharing_location');await load();render()}},
+  sharePrec:async v=>{if(await run(sb.from('profiles').update({share_precision:v}).eq('id',myId),v==='area'?'Gli amici vedono solo la zona':'Gli amici vedono la posizione esatta')){lastShare=null;maybeShare(true)}},
   toggle:k=>{db.me[k]=!db.me[k];save();render()},
   set:(k,v)=>{db.me[k]=v;save();render()},
   areaDel:i=>{db.me.areas.splice(+i,1);save();render()},
@@ -1090,7 +1119,11 @@ async function enter(session){
 }
 async function openApp(){
   $('#auth').classList.add('hide');
-  subscribe();render();toast('Ciao '+(db.me.name||'')+'!');await initPush();render();routeHash();
+  subscribe();render();toast('Ciao '+(db.me.name||'')+'!');maybeShare(true);await initPush();render();routeHash();
+  const k='applocale_share_notice_'+myId;
+  if(wantShare()&&!localStorage.getItem(k)){try{localStorage.setItem(k,'1')}catch(e){}
+    openModal(`<h3>La tua posizione è visibile ai tuoi amici</h3><p class="meta">App Locale funziona intorno a dove sei: i tuoi amici ti vedono sulla mappa, gli altri no. Puoi spegnerla quando vuoi da Profilo → Posizione per gli amici.</p>
+      <div class="btns"><button class="sec" data-act="shareToggle">Spegnila</button><button class="pri" data-close>Va bene</button></div>`,'notice')}
 }
 function drawSetupAv(){$('#sAv').innerHTML=av('me','lg')+'<label for="avFile" aria-label="Aggiungi una foto profilo"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.2\" stroke-linejoin=\"round\"><path d=\"M4 8h3l2-3h6l2 3h3v11H4z\"/><circle cx=\"12\" cy=\"13\" r=\"3.5\"/></svg></label>'}
 let setupWatched=false;
@@ -1102,12 +1135,15 @@ function showSetup(){
   if(!setupWatched){watchUser($('#sUser'),$('#sUserMsg'));setupWatched=true}
   checkUser($('#sUser').value,$('#sUserMsg'));
 }
+$('#sShare').onclick=()=>{const b=$('#sShare');b.classList.toggle('on');b.setAttribute('aria-checked',b.classList.contains('on'))};
 $('#aSetup').onsubmit=async e=>{e.preventDefault();
   const n=$('#sName').value.trim(),u=$('#sUser').value.trim().toLowerCase(),b=$('#sSave');
   if(!n){aMsg('Scrivi il tuo nome.','err');return}
   b.disabled=true;
   if(!(await checkUser(u,$('#sUserMsg')))){b.disabled=false;return}
-  const{error}=await sb.from('profiles').update({display_name:n,username:u,onboarded_at:iso(now())}).eq('id',myId);
+  const shareOn=$('#sShare').classList.contains('on');
+  const{error}=await sb.from('profiles').update({display_name:n,username:u,onboarded_at:iso(now()),share_location:shareOn}).eq('id',myId);
+  try{localStorage.setItem('applocale_share_notice_'+myId,'1')}catch(e){}
   b.disabled=false;
   if(error){aMsg(/duplicate|unique/i.test(error.message)?'@'+u+' è appena stato preso, scegline un altro.':'Non salvato: '+error.message,'err');return}
   await load();openApp();
