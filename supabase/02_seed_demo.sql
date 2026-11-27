@@ -2,7 +2,8 @@
 
 insert into public.members (email,name,color) values
   ('alessandro@ecclesieagazzi.com','Alessandro','#1677ff'),
-  ('giovanni.assolari95@gmail.com','Giovanni','#30a46c')
+  ('giovanni.assolari95@gmail.com','Giovanni','#30a46c'),
+  ('assolarigiovanni@icloud.com','Giovanni','#30a46c')
 on conflict (email) do update set name=excluded.name, color=excluded.color;
 
 insert into public.places (id,name,category,lat,lng,info) values

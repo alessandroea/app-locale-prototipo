@@ -6,13 +6,17 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#ffffff">
-<title>App Locale – V04</title>
+<title>App Locale – V05</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-title" content="App Locale">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>
-/* V04 prototipo – App Locale (Alessandro & Giovanni)
+/* V05 prototipo – App Locale (Alessandro & Giovanni)
    Accesso privato con Supabase (email/password o Google).
-   Luoghi, stato live, domande, risposte e voti salvati nel database condiviso.
-   Gruppi, amici, notifiche e impostazioni restano demo su questo telefono. */
+   Luoghi, stato live, domande, risposte, voti, amicizie e avvisi salvati nel database condiviso.
+   Ricerca dei posti in tutto il mondo (OpenStreetMap) e notifiche push sul telefono.
+   Gruppi e impostazioni restano demo su questo telefono. */
 :root{--bg:#fff;--ink:#14202b;--mute:#6b7785;--line:#e6e9ed;--acc:#e5484d;--news:#2f6fe4;--me:#1677ff;--soft:#f3f5f7;--ok:#30a46c;--tab:64px}
 *{box-sizing:border-box;min-width:0}
 html,body{height:100%;margin:0}
@@ -125,6 +129,7 @@ label{display:block;font-size:13px;color:var(--mute);margin:12px 0 6px}
 .q-pin{width:30px;height:30px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:var(--acc);border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.3);display:grid;place-items:center}
 .q-pin span{transform:rotate(45deg);color:#fff;font-weight:700;font-size:14px}
 .q-pin.news{background:var(--news)}
+.spot-pin{width:34px;height:34px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:var(--ink);border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.35)}
 .pl{display:inline-flex;align-items:center;gap:6px;background:#fff;border-radius:99px;padding:5px 10px 5px 7px;box-shadow:0 2px 8px rgba(0,0,0,.22);font:600 12px/1 -apple-system,system-ui,sans-serif;color:var(--ink);white-space:nowrap;transform:translate(-50%,-50%)}
 .pl i{width:10px;height:10px;border-radius:50%;background:#9aa4af}
 .pl b{background:var(--acc);color:#fff;border-radius:99px;padding:2px 6px;font-size:11px}
@@ -218,7 +223,7 @@ label{display:block;font-size:13px;color:var(--mute);margin:12px 0 6px}
       <button class="sec big" id="aOut" type="button">Esci</button>
     </div>
     <p class="amsg" id="aMsg" role="status"></p>
-    <p class="demo">Prototipo V04 · dati salvati nel database condiviso</p>
+    <p class="demo">Prototipo V05 · dati salvati nel database condiviso</p>
   </div>
 </div>
 
@@ -232,7 +237,7 @@ const SB_URL='https://tigxpqmedwlwthomvunb.supabase.co';
 const SB_KEY='sb_publishable_np6dcaeo0Hbbd63wlzb1FQ_Nz5_ryoU';
 const APP_URL=location.origin+location.pathname;
 const sb=supabase.createClient(SB_URL,SB_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
-let myId=null,myEmail='',PROF={};
+let myId=null,myEmail='',PROF={},FR=[],NOTIFS=[];
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const now=()=>Date.now();
@@ -296,19 +301,23 @@ const iso=ms=>new Date(ms).toISOString();
 async function load(){
   $('#loading').classList.remove('hide');
   const since=iso(now()-6*H);
-  const [pl,rp,po,an,vo,pr]=await Promise.all([
+  const [pl,rp,po,an,vo,pr,fr,nt]=await Promise.all([
     sb.from('places').select('id,name,category,lat,lng,info'),
     sb.from('place_reports').select('place_id,status,is_demo,demo_offset_min,created_at').or(`is_demo.eq.true,created_at.gt.${since}`),
     sb.from('posts').select('id,kind,category,place_id,place_label,lat,lng,radius_m,body,author_id,demo_author,is_demo,demo_offset_min,base_votes,best_answer_id,created_at,expires_at').or(`is_demo.eq.true,expires_at.gt.${since}`),
     sb.from('answers').select('id,post_id,body,distance_m,author_id,demo_author,is_demo,demo_offset_min,base_votes,created_at'),
     sb.from('votes').select('user_id,post_id,answer_id'),
-    sb.from('profiles').select('id,display_name,color')
+    sb.from('profiles').select('id,display_name,color'),
+    sb.from('friendships').select('id,requester_id,addressee_id,status'),
+    sb.from('notifications').select('id,kind,post_id,body,read_at,created_at').order('created_at',{ascending:false}).limit(100)
   ]);
   $('#loading').classList.add('hide');
-  const err=[pl,rp,po,an,vo,pr].find(r=>r.error);
+  const err=[pl,rp,po,an,vo,pr,fr,nt].find(r=>r.error);
   if(err){toast('Errore dal database: '+err.error.message);return false}
   PROF={};pr.data.forEach(p=>PROF[p.id]={n:p.display_name,c:p.color});
   if(PROF[myId]){db.me.name=PROF[myId].n}
+  FR=fr.data.map(f=>({id:f.id,other:f.requester_id===myId?f.addressee_id:f.requester_id,status:f.status,incoming:f.addressee_id===myId}));
+  NOTIFS=nt.data.map(n=>({id:'db'+n.id,dbId:n.id,text:n.body,t:Date.parse(n.created_at),read:!!n.read_at,post:n.post_id,tab:n.kind.startsWith('friend')?'me':null}));
   const T=r=>r.is_demo?now()-(r.demo_offset_min||0)*M:Date.parse(r.created_at);
   const who=r=>r.author_id?(r.author_id===myId?'me':r.author_id):r.demo_author;
   const vP={},vA={},myP=new Set(),myA=new Set();
@@ -339,23 +348,51 @@ async function run(promise,okMsg){
   await load();render();return data??true;
 }
 
-/* ---------- tempo reale: le novità di Giovanni (o tue da un altro telefono) arrivano subito ---------- */
+/* ---------- tempo reale: le novità arrivano subito; gli avvisi li crea il database ---------- */
 function subscribe(){
   const ch=sb.channel('app-locale-live');
-  ['posts','answers','votes','place_reports'].forEach(t=>ch.on('postgres_changes',{event:'*',schema:'public',table:t},e=>onLive(t,e)));
+  ['posts','answers','votes','place_reports','friendships'].forEach(t=>ch.on('postgres_changes',{event:'*',schema:'public',table:t},()=>reloadSoon()));
+  ch.on('postgres_changes',{event:'INSERT',schema:'public',table:'notifications',filter:'user_id=eq.'+myId},e=>{toast(String(e.new.body||'Nuovo avviso').slice(0,90));reloadSoon()});
   ch.subscribe();
 }
-function onLive(table,e){
-  const r=e.new||{};
-  if(e.eventType==='INSERT'&&r.author_id&&r.author_id!==myId){
-    const n=(PROF[r.author_id]||{}).n||'Qualcuno';
-    if(table==='posts'){db.notifs.push({id:uid(),text:`${n}: “${String(r.body).slice(0,60)}”`,t:now(),read:false,post:r.id});toast('Nuova domanda da '+n)}
-    if(table==='answers'){const p=db.posts.find(x=>x.id===r.post_id);
-      if(p&&(p.by==='me'||p.follow)){db.notifs.push({id:uid(),text:`${n} ha risposto: “${p.text.slice(0,50)}”`,t:now(),read:false,post:p.id});toast('Nuova risposta da '+n)}}
-    save();
-  }
-  reloadSoon();
+
+/* ---------- notifiche push sul telefono ---------- */
+const isIOS=/iP(hone|ad|od)/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+const standalone=matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
+const PUSH_OK='serviceWorker' in navigator&&'PushManager' in window&&'Notification' in window;
+let swReg=null,pushState='unsupported';
+const b64u=str=>{const p='='.repeat((4-str.length%4)%4),b=atob((str+p).replace(/-/g,'+').replace(/_/g,'/'));return Uint8Array.from(b,c=>c.charCodeAt(0))};
+async function saveSub(sub){const j=sub.toJSON();
+  return sb.rpc('save_push_subscription',{p_endpoint:j.endpoint,p_p256dh:j.keys.p256dh,p_auth:j.keys.auth,p_user_agent:navigator.userAgent})}
+async function initPush(){
+  if(!('serviceWorker' in navigator)){pushState='unsupported';return}
+  try{swReg=await navigator.serviceWorker.register('sw.js')}catch(e){pushState='unsupported';return}
+  navigator.serviceWorker.addEventListener('message',e=>{if(e.data&&e.data.type==='open'){location.hash=new URL(e.data.url).hash;routeHash()}});
+  await refreshPush();
 }
+async function refreshPush(){
+  if(!PUSH_OK||!swReg){pushState=isIOS&&!standalone?'ios-home':'unsupported';return}
+  if(Notification.permission==='denied'){pushState='denied';return}
+  const sub=await swReg.pushManager.getSubscription();
+  pushState=sub&&Notification.permission==='granted'?'on':'off';
+  if(pushState==='on')saveSub(sub); // tiene aggiornato il telefono nel database
+}
+const pushTxt=()=>({on:'Attive su questo telefono: ricevi un avviso anche ad app chiusa',
+  off:'Ricevi un avviso quando qualcuno risponde o ti scrive, anche ad app chiusa',
+  'ios-home':'Su iPhone: tocca Condividi → “Aggiungi alla schermata Home”, apri App Locale dall’icona, accedi e torna qui',
+  denied:'Bloccate: riattivale da Impostazioni → Notifiche → App Locale',
+  unsupported:'Questo browser non supporta le notifiche push'})[pushState];
+function clearBadge(){try{navigator.clearAppBadge&&navigator.clearAppBadge()}catch(e){}}
+
+/* ---------- apertura da una notifica: #post=… o #tab=… ---------- */
+function routeHash(){
+  const h=location.hash,m=h.match(/post=([0-9a-f-]{36})/),t=h.match(/tab=(map|feed|groups|act|me)/);
+  if(!m&&!t)return;
+  history.replaceState(null,'',location.pathname+location.search);
+  if(t)setTab(t[1]);
+  if(m){if(db.posts.some(p=>p.id===m[1]))openThread(m[1]);else load().then(ok=>{if(ok){render();openThread(m[1])}})}
+}
+window.addEventListener('hashchange',()=>{if(myId)routeHash()});
 
 /* ---------- utilità ---------- */
 function dist(a,b){const R=6371000,r=x=>x*Math.PI/180,dLa=r(b.lat-a.lat),dLo=r(b.lng-a.lng);
@@ -370,6 +407,7 @@ const user=id=>id==='me'?meU():U[id]||PROF[id]||{n:'Utente',c:'#6b7785'};
 const ini=n=>n.split(/\s+/).map(w=>w[0]).join('').slice(0,2).toUpperCase();
 const av=(id,cls='')=>{const u=user(id);return`<span class="av ${cls}" style="background:${u.c}">${esc(ini(u.n))}</span>`};
 const placeOf=p=>db.places.find(x=>x.id===p.placeId);
+const isFriend=by=>by==='me'||db.friends[by]==='friend'||FR.some(f=>f.status==='accepted'&&f.other===by);
 function status(pl){const r=pl.reports.filter(x=>now()-x.t<60*M);if(!r.length)return null;
   const c={};r.forEach(x=>c[x.type]=(c[x.type]||0)+1);const type=Object.keys(c).sort((a,b)=>c[b]-c[a])[0];
   return{type,n:r.length,last:Math.max(...r.map(x=>x.t))}}
@@ -455,7 +493,7 @@ function setTab(t){tab=t;
   render();
 }
 function render(){
-  const unread=db.notifs.filter(n=>!n.read).length;$('#badge').textContent=unread;$('#badge').classList.toggle('hide',!unread);
+  const unread=allN().filter(n=>!n.read).length;$('#badge').textContent=unread;$('#badge').classList.toggle('hide',!unread);
   if(tab==='map')renderMapUi();
   if(tab==='feed')renderFeed();
   if(tab==='groups')renderGroups();
@@ -467,7 +505,7 @@ function renderFeed(){
   if(feedF==='near')list.sort((a,b)=>(a.d??0)-(b.d??0));
   if(feedF==='hot')list.sort((a,b)=>(b.votes+b.answers.length*2)-(a.votes+a.answers.length*2));
   if(feedF==='new')list.sort((a,b)=>b.t-a.t);
-  if(feedF==='friends')list=list.filter(p=>db.friends[p.by]==='friend'||p.by==='me');
+  if(feedF==='friends')list=list.filter(p=>isFriend(p.by));
   if(feedF==='follow')list=list.filter(p=>p.follow||p.by==='me');
   if(feedCat)list=list.filter(p=>p.cat===feedCat);
   const F=[['near','Vicino a me'],['new','Più recenti'],['hot','Popolari'],['friends','Amici'],['follow','Seguiti']];
@@ -484,9 +522,12 @@ function renderGroups(){
     <div class="sec-t">I tuoi gruppi</div>${mine.length?mine.map(gc).join(''):'<p class="empty">Non sei ancora in nessun gruppo.</p>'}
     <div class="sec-t">Consigliati vicino a te</div>${other.map(gc).join('')}<p class="demo">Dati di esempio</p>`;
 }
+const allN=()=>[...NOTIFS,...db.notifs];
 function renderAct(){
-  $('#v-act').innerHTML=`<h1>Attività</h1><p class="sub">Notifiche entro ${fmtD(+db.me.radius)} da te${db.me.quiet?' · non disturbare 23–7 attivo':''}</p>
-    <div class="box2">${db.notifs.slice().sort((a,b)=>b.t-a.t).map(n=>`<div class="row" data-n="${n.id}" ${n.post?`data-act="thread" data-id="${n.post}"`:n.tab?`data-act="tab" data-id="${n.tab}"`:''} style="cursor:pointer">
+  clearBadge();
+  $('#v-act').innerHTML=`<h1>Attività</h1><p class="sub">Risposte alle tue domande, nuove domande e richieste di amicizia</p>
+    ${pushState!=='on'?`<button class="card" data-act="tab" data-id="me"><b>Attiva le notifiche sul telefono</b><div class="meta">${esc(pushTxt())}</div></button>`:''}
+    <div class="box2">${allN().sort((a,b)=>b.t-a.t).map(n=>`<div class="row" data-n="${n.id}" ${n.post?`data-act="thread" data-id="${n.post}"`:n.tab?`data-act="tab" data-id="${n.tab}"`:''} style="cursor:pointer">
       <span class="st"><i style="background:${n.read?'#c3cad2':'var(--acc)'}"></i></span><div><div style="font-weight:${n.read?400:600}">${esc(n.text)}</div><div class="meta">${ago(n.t)}</div></div></div>`).join('')}</div>
     <div class="btns"><button class="sec" data-act="readAll">Segna tutte come lette</button></div>`;
 }
@@ -495,17 +536,24 @@ function renderMe(){
   const pts=myPoints(),lvl=pts>=100?'Esperto di zona':pts>=30?'Informatore':'Nuovo arrivato';
   const fr=Object.entries(db.friends);
   const sugg=Object.keys(U).filter(k=>!db.friends[k]).slice(0,3);
+  const known=new Set(FR.map(f=>f.other)),people=Object.keys(PROF).filter(id=>id!==myId&&!known.has(id));
+  const nFriends=fr.filter(f=>f[1]==='friend').length+FR.filter(f=>f.status==='accepted').length;
+  const ex=' <span class="tag cat">Esempio</span>';
+  const frRow=f=>`<div class="row">${av(f.other)}<div><b>${esc(user(f.other).n)}</b><div class="meta">${f.status==='accepted'?'Amico':f.incoming?'Vuole essere tuo amico':'Richiesta inviata'}</div></div>
+      ${f.status==='accepted'?`<button class="small sec" data-act="rfDel" data-id="${f.id}">Rimuovi</button>`:f.incoming?`<button class="small pri" data-act="rfAccept" data-id="${f.id}">Accetta</button><button class="small sec" data-act="rfDel" data-id="${f.id}">No</button>`:`<button class="small sec" data-act="rfDel" data-id="${f.id}">Annulla</button>`}</div>`;
   const sw=(k,on)=>`<button class="sw ${on?'on':''}" data-act="toggle" data-id="${k}" role="switch" aria-checked="${on}" aria-label="${k}"></button>`;
   const seg=(k,opts)=>`<div class="seg">${opts.map(([v,l])=>`<button class="${String(db.me[k])===v?'on':''}" data-act="set" data-id="${k}" data-v="${v}">${l}</button>`).join('')}</div>`;
   $('#v-me').innerHTML=`<div class="who" style="gap:14px;margin-top:6px">${av('me','lg')}<div><h1 style="margin:0">${esc(db.me.anon?'Anonimo':db.me.name)}</h1><div class="meta">${lvl} · ${pts} punti</div></div></div>
-    <div class="stats"><div><b>${mineQ}</b><span class="meta">Domande</span></div><div><b>${mineA}</b><span class="meta">Risposte</span></div><div><b>${fr.filter(f=>f[1]==='friend').length}</b><span class="meta">Amici</span></div></div>
+    <div class="stats"><div><b>${mineQ}</b><span class="meta">Domande</span></div><div><b>${mineA}</b><span class="meta">Risposte</span></div><div><b>${nFriends}</b><span class="meta">Amici</span></div></div>
     <p class="meta">Guadagni punti quando rispondi da vicino e la tua risposta è votata utile. I punti danno più peso alle tue risposte.</p>
 
-    <div class="sec-t">Amici <span class="phase">Fase 2</span></div>
-    <div class="box2">${fr.map(([k,s])=>`<div class="row">${av(k)}<div><b>${esc(U[k].n)}</b><div class="meta">${s==='friend'?(U[k].b||U[k].rep+' punti'):'Vuole essere tua amica'}</div></div>
+    <div class="sec-t">Amici</div>
+    <div class="box2">${FR.slice().sort((a,b)=>(b.incoming&&b.status==='pending')-(a.incoming&&a.status==='pending')).map(frRow).join('')}${fr.map(([k,s])=>`<div class="row">${av(k)}<div><b>${esc(U[k].n)}</b>${ex}<div class="meta">${s==='friend'?(U[k].b||U[k].rep+' punti'):'Vuole essere tua amica'}</div></div>
       ${s==='request'?`<button class="small pri" data-act="fAccept" data-id="${k}">Accetta</button><button class="small sec" data-act="fDecline" data-id="${k}">No</button>`:s==='sent'?'<span class="meta">Richiesta inviata</span>':`<button class="small sec" data-act="fRemove" data-id="${k}">Rimuovi</button>`}</div>`).join('')}</div>
-    <div class="sec-t">Persone attive vicino a te</div>
-    <div class="box2">${sugg.length?sugg.map(k=>`<div class="row">${av(k)}<div><b>${esc(U[k].n)}</b><div class="meta">${U[k].rep} punti${U[k].b?' · '+U[k].b:''}</div></div><button class="small pri" data-act="fAdd" data-id="${k}">Aggiungi</button></div>`).join(''):'<p class="empty">Nessun suggerimento</p>'}</div>
+    <div class="sec-t">Persone nell'app</div>
+    <div class="box2">${people.length?people.map(id=>`<div class="row">${av(id)}<div><b>${esc(user(id).n)}</b><div class="meta">Membro del prototipo</div></div><button class="small pri" data-act="rfAdd" data-id="${id}">Aggiungi</button></div>`).join(''):'<p class="empty">Siete già tutti amici o in attesa di risposta.</p>'}</div>
+    <div class="sec-t">Suggeriti</div>
+    <div class="box2">${sugg.length?sugg.map(k=>`<div class="row">${av(k)}<div><b>${esc(U[k].n)}</b>${ex}<div class="meta">${U[k].rep} punti${U[k].b?' · '+U[k].b:''}</div></div><button class="small pri" data-act="fAdd" data-id="${k}">Aggiungi</button></div>`).join(''):'<p class="empty">Nessun suggerimento</p>'}</div>
 
     <div class="sec-t">Privacy</div>
     <div class="box2">
@@ -514,6 +562,7 @@ function renderMe(){
     </div>
     <div class="sec-t">Notifiche</div>
     <div class="box2">
+      <div class="row"><div><b>Notifiche sul telefono</b><div class="meta">${esc(pushTxt())}</div></div>${pushState==='on'?'<button class="small sec" data-act="pushOff">Disattiva</button>':pushState==='off'?'<button class="small pri" data-act="pushOn">Attiva</button>':''}</div>
       <div class="row" style="display:block"><b>Avvisami di domande entro</b>${seg('radius',[['500','500 m'],['1000','1 km'],['5000','5 km']]).replace('class="seg"','class="seg" style="margin-top:8px"')}</div>
       <div class="row"><div><b>Non disturbare 23–7</b><div class="meta">Max 3 notifiche l'ora negli altri orari</div></div>${sw('quiet',db.me.quiet)}</div>
     </div>
@@ -527,7 +576,7 @@ function renderMe(){
       <div class="row"><div><b>Utenti bloccati</b><div class="meta">${(db.blocked||[]).length} bloccati</div></div></div>
       <div class="row"><button class="small sec red" data-act="reset">Ripristina gruppi, amici e impostazioni demo</button></div>
     </div>
-    <p class="demo">Prototipo V04 · domande, risposte, voti e stato dei luoghi nel database · gruppi, amici e notifiche solo su questo telefono</p>`;
+    <p class="demo">Prototipo V05 · domande, risposte, voti, amicizie e avvisi nel database · gruppi e impostazioni solo su questo telefono · “Esempio” = demo</p>`;
 }
 
 /* ---------- modale ---------- */
@@ -555,17 +604,18 @@ function openPlace(id){
   map.panTo([pl.lat,pl.lng]);
 }
 
-function openAsk(placeId,text){
+function openAsk(placeId,text,sp){
   const pl=placeId?db.places.find(x=>x.id===placeId):null;
-  if(!pl&&!me){toast('Serve la posizione: usa ⊕ e tocca la mappa');return}
-  openModal(`<h3>${pl?'Chiedi a chi è lì':'Cosa succede qui?'}</h3><div class="meta">📍 ${esc(pl?pl.name:placeLabel)}</div>
+  if(!pl&&!sp&&!me){toast('Serve la posizione: usa ⊕ e tocca la mappa, oppure cerca un posto con la lente');return}
+  const label=pl?pl.name:sp?sp.name:placeLabel,defR=sp&&AREA.includes(sp.type)?'5000':'1000';
+  openModal(`<h3>${pl||sp?'Chiedi a chi è lì':'Cosa succede qui?'}</h3><div class="meta">📍 ${esc(label)}${sp?' · '+esc(short(sp.addr)):''}</div>
     <form id="askForm">
     <div class="seg" data-name="type" style="margin-top:12px"><button type="button" class="on" data-v="q">Domanda</button><button type="button" data-v="n">Notizia</button></div>
     <textarea id="askText" maxlength="280" placeholder="Es. Perché c'è così tanta gente?" style="margin-top:10px" required>${esc(text||'')}</textarea>
     <label>Categoria</label>
     <div class="chips" data-name="cat" style="margin:0 -16px">${Object.entries(CATS).map(([k,l],i)=>`<button type="button" class="chip ${k==='info'?'on':''}" data-v="${k}">${l}</button>`).join('')}</div>
     <label>Chi può rispondere</label>
-    <div class="seg" data-name="radius"><button type="button" data-v="300">300 m</button><button type="button" class="on" data-v="1000">1 km</button><button type="button" data-v="5000">5 km</button></div>
+    <div class="seg" data-name="radius">${[['300','300 m'],['1000','1 km'],['5000','5 km']].map(([v,l])=>`<button type="button" class="${v===defR?'on':''}" data-v="${v}">${l}</button>`).join('')}</div>
     <label>Scade dopo</label>
     <div class="seg" data-name="exp"><button type="button" data-v="1">1 ora</button><button type="button" class="on" data-v="3">3 ore</button><button type="button" data-v="24">24 ore</button></div>
     <div class="meta" style="margin-top:10px">Pubblichi come <b>${esc(meU().n)}</b> · cambia in Profilo</div>
@@ -573,8 +623,8 @@ function openAsk(placeId,text){
   const f=$('#askForm');
   f.onsubmit=async e=>{e.preventDefault();const t=$('#askText').value.trim();if(!t)return;
     const v=n=>f.querySelector(`[data-name="${n}"] .on`).dataset.v;
-    const base=pl||me,btn=f.querySelector('.pri');btn.disabled=true;btn.textContent='Salvo…';
-    const id=await run(sb.rpc('create_post',{p_kind:v('type'),p_category:v('cat'),p_place_id:pl?pl.id:null,p_place_label:pl?pl.name:placeLabel,
+    const base=pl||sp||me,btn=f.querySelector('.pri');btn.disabled=true;btn.textContent='Salvo…';
+    const id=await run(sb.rpc('create_post',{p_kind:v('type'),p_category:v('cat'),p_place_id:pl?pl.id:null,p_place_label:label,
       p_lat:base.lat,p_lng:base.lng,p_radius_m:+v('radius'),p_hours:+v('exp'),p_body:t}),'Pubblicata ✓ salvata nel database');
     if(!id){btn.disabled=false;btn.textContent='Pubblica';return}
     if(!db.follow.includes(id))db.follow.push(id);save();openThread(id);
@@ -619,13 +669,49 @@ function openGroup(id){
   openId=id;
 }
 
+let geoRes=[],spot=null,spotMarker=null;
+const AREA=['city','town','village','municipality','hamlet','suburb','county','state','region','province','country','city_district','borough','quarter','neighbourhood'];
+const short=a=>String(a||'').split(',').slice(1,4).join(',').trim();
 function openSearch(){
-  openModal(`<h3>Cerca un posto</h3><input id="q" placeholder="Es. Kew, stazione, parco" autocomplete="off">
-    <div id="qres" style="margin-top:8px"></div><div class="btns"><button class="sec" data-close>Chiudi</button></div>`,'search');
+  openModal(`<h3>Cerca un posto</h3>
+    <form id="qf" style="display:flex;gap:8px;margin-top:8px"><input id="q" type="search" enterkeyhint="search" placeholder="Es. Bergamo, Trescore Balneario, Kew" autocomplete="off"><button class="pri" style="flex:none">Cerca</button></form>
+    <div id="qloc"></div><div id="qgeo"></div><div class="btns"><button class="sec" data-close>Chiudi</button></div>`,'search');
   const draw=()=>{const q=$('#q').value.trim().toLowerCase();
     const r=withD(db.places).filter(p=>!q||(p.name+' '+p.cat).toLowerCase().includes(q)).sort((a,b)=>(a.d??0)-(b.d??0));
-    $('#qres').innerHTML=r.map(p=>`<div class="row" data-act="place" data-id="${p.id}" style="cursor:pointer"><div><b>${esc(p.name)}</b><div class="meta">${esc(p.cat)}${p.d!=null?' · '+fmtD(p.d):''}</div></div>${stHtml(p)}</div>`).join('')||'<p class="empty">Nessun posto trovato</p>'};
-  $('#q').oninput=draw;draw();setTimeout(()=>$('#q').focus(),60);
+    $('#qloc').innerHTML=r.length?'<label>Posti nell’app</label>'+r.map(p=>`<div class="row" data-act="place" data-id="${p.id}" style="cursor:pointer"><div><b>${esc(p.name)}</b><div class="meta">${esc(p.cat)}${p.d!=null?' · '+fmtD(p.d):''}</div></div>${stHtml(p)}</div>`).join(''):'';
+    if(!$('#qgeo').dataset.done)$('#qgeo').innerHTML=q.length>=2?'<p class="meta" style="margin-top:12px">Tocca Cerca per trovarlo in tutto il mondo.</p>':''};
+  $('#q').oninput=()=>{delete $('#qgeo').dataset.done;draw()};
+  $('#qf').onsubmit=async e=>{e.preventDefault();const q=$('#q').value.trim();if(q.length<2)return;$('#q').blur();
+    const box=$('#qgeo');box.dataset.done='1';box.innerHTML='<p class="meta" style="margin-top:12px">Cerco nel mondo…</p>';
+    try{const r=await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(q)}&limit=8&accept-language=it`);
+      const j=await r.json();
+      geoRes=j.map(x=>({name:x.name||String(x.display_name).split(',')[0],addr:x.display_name,lat:+x.lat,lng:+x.lon,type:x.addresstype||x.type,bbox:(x.boundingbox||[]).map(Number)}));
+      box.innerHTML='<label>Nel mondo</label>'+(geoRes.length?geoRes.map((g,i)=>`<div class="row" data-act="geo" data-id="${i}" style="cursor:pointer"><div><b>${esc(g.name)}</b><div class="meta">${esc(short(g.addr))}${me?' · '+fmtD(dist(me,g)):''}</div></div><span class="meta">›</span></div>`).join(''):'<p class="empty">Nessun posto trovato. Prova a scriverlo in un altro modo.</p>')+
+        '<p class="demo">Ricerca © OpenStreetMap</p>';
+    }catch(err){box.innerHTML='<p class="empty">Ricerca non disponibile ora, riprova tra poco.</p>'}};
+  draw();setTimeout(()=>$('#q').focus(),60);
+}
+function showSpot(){
+  const s=spot,b=s.bbox;
+  if(b.length===4&&AREA.includes(s.type))map.fitBounds([[b[0],b[2]],[b[1],b[3]]],{maxZoom:15});else map.setView([s.lat,s.lng],16);
+  if(spotMarker)map.removeLayer(spotMarker);
+  spotMarker=L.marker([s.lat,s.lng],{icon:L.divIcon({className:'',html:'<div class="spot-pin"></div>',iconSize:[34,34],iconAnchor:[17,34]}),zIndexOffset:900}).on('click',openSpot).addTo(map);
+  openSpot();
+}
+function openSpot(){
+  const s=spot;if(!s)return;
+  const d=me?dist(me,s):null,big=AREA.includes(s.type),R=big?5000:1500;
+  const posts=alive().filter(p=>dist(p,s)<=R).sort((a,b)=>b.t-a.t),pls=withD(db.places).filter(p=>dist(p,s)<=R);
+  const qs=big?['Cosa succede oggi qui?','C\'è traffico per arrivare?','C\'è qualche evento?']:['C\'è coda adesso?','È aperto?','C\'è tanta gente?','Si trova parcheggio?'];
+  openModal(`<span class="tag cat">Cercato su OpenStreetMap</span><h3>${esc(s.name)}</h3>
+    <div class="meta">${esc(short(s.addr))}${d!=null?' · a '+fmtD(d)+' da te':''}</div>
+    <p class="meta" style="margin-top:8px">Non serve essere qui: la domanda arriva a chi è in zona.</p>
+    <label>Domande veloci</label>
+    <div class="chips" style="margin:0 -16px">${qs.map(q=>`<button class="chip" data-act="askSpot" data-v="${esc(q)}">${esc(q)}</button>`).join('')}</div>
+    ${pls.length?`<label>Posti nell'app qui intorno</label>${pls.map(p=>`<div class="row" data-act="place" data-id="${p.id}" style="cursor:pointer"><div><b>${esc(p.name)}</b><div class="meta">${esc(p.cat)}</div></div>${stHtml(p)}</div>`).join('')}`:''}
+    <label>Conversazioni entro ${fmtD(R)} (${posts.length})</label>
+    ${posts.length?posts.map(p=>postCard(p)).join(''):'<p class="empty">Ancora nessuna. Fai la prima domanda.</p>'}
+    <div class="btns"><button class="sec" data-close>Chiudi</button><button class="pri" data-act="askSpot" data-v="">Chiedi a chi è lì</button></div>`,'spot');
 }
 
 /* ---------- azioni ---------- */
@@ -640,7 +726,8 @@ const actions={
   sheet:()=>$('#sheet').classList.toggle('min'),
   tab:id=>{closeModal();setTab(id)},
   feedF:id=>{feedF=id;render()},feedCat:id=>{feedCat=id;render()},
-  readAll:()=>{db.notifs.forEach(n=>n.read=true);save();render()},
+  readAll:async()=>{db.notifs.forEach(n=>n.read=true);save();const ids=NOTIFS.filter(n=>!n.read).map(n=>n.dbId);clearBadge();
+    if(ids.length)await run(sb.from('notifications').update({read_at:iso(now())}).in('id',ids));else render()},
   report:async(id,v)=>{if(await run(sb.from('place_reports').insert({place_id:id,status:v,author_id:myId}),'Grazie! Segnalazione “'+REP[v].l+'” salvata'))openPlace(id)},
   voteP:async id=>{const p=db.posts.find(x=>x.id===id);
     if(await run(p.voted?sb.from('votes').delete().eq('post_id',id).eq('user_id',myId):sb.from('votes').insert({post_id:id,user_id:myId})))openThread(id)},
@@ -662,6 +749,25 @@ const actions={
   logout:async()=>{await sb.auth.signOut();location.replace(APP_URL)},
   join:id=>{const g=db.groups.find(x=>x.id===id);g.joined=!g.joined;save();toast(g.joined?'Ti sei unito a '+g.name:'Sei uscito dal gruppo');openGroup(id);render()},
   gPost:id=>{const t=$('#gText').value.trim();if(!t)return;const g=db.groups.find(x=>x.id===id);g.posts.push({id:uid(),by:'me',text:t,t:now(),replies:0});save();openGroup(id)},
+  rfAdd:async id=>{await run(sb.from('friendships').insert({requester_id:myId,addressee_id:id}),'Richiesta inviata a '+user(id).n)},
+  rfAccept:async id=>{const f=FR.find(x=>String(x.id)===String(id));
+    await run(sb.from('friendships').update({status:'accepted',responded_at:iso(now())}).eq('id',id),f?'Ora tu e '+user(f.other).n+' siete amici':'Amicizia accettata')},
+  rfDel:async id=>{await run(sb.from('friendships').delete().eq('id',id))},
+  pushOn:async()=>{
+    if(isIOS&&!standalone){toast('Prima aggiungi l’app alla schermata Home');return}
+    if(!PUSH_OK||!swReg){toast('Notifiche non supportate qui');return}
+    const perm=await Notification.requestPermission();
+    if(perm!=='granted'){await refreshPush();render();toast('Permesso non concesso');return}
+    const{data:key,error}=await sb.rpc('push_public_key');if(error||!key){toast('Chiave push non disponibile');return}
+    try{const sub=await swReg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64u(key)});
+      const r=await saveSub(sub);if(r.error){toast('Non salvato: '+r.error.message);return}
+      pushState='on';render();toast('Notifiche attive su questo telefono ✓')}catch(e){toast('Errore: '+e.message)}},
+  pushOff:async()=>{const sub=swReg&&await swReg.pushManager.getSubscription();
+    if(sub){await sb.from('push_subscriptions').delete().eq('endpoint',sub.endpoint);await sub.unsubscribe()}
+    pushState='off';render();toast('Notifiche disattivate su questo telefono')},
+  geo:i=>{const r=geoRes[+i];if(!r)return;spot=r;closeModal();showSpot()},
+  spot:()=>openSpot(),
+  askSpot:(_,v)=>openAsk(null,v,spot),
   fAccept:k=>{db.friends[k]='friend';save();toast('Ora tu e '+U[k].n+' siete amici');render()},
   fDecline:k=>{delete db.friends[k];save();render()},
   fRemove:k=>{delete db.friends[k];save();render()},
@@ -679,7 +785,8 @@ document.addEventListener('click',e=>{
   const tb=e.target.closest('[data-tab]');if(tb){setTab(tb.dataset.tab);return}
   if(e.target.closest('[data-close]')||e.target.id==='modal'){closeModal();return}
   const sg=e.target.closest('[data-name] [data-v]');if(sg&&sg.type==='button'){sg.parentElement.querySelectorAll('[data-v]').forEach(x=>x.classList.toggle('on',x===sg));return}
-  const nr=e.target.closest('[data-n]');if(nr){const n=db.notifs.find(x=>x.id===nr.dataset.n);if(n&&!n.read){n.read=true;save();render()}}
+  const nr=e.target.closest('[data-n]');if(nr){const n=allN().find(x=>x.id===nr.dataset.n);if(n&&!n.read){n.read=true;
+    if(n.dbId)sb.from('notifications').update({read_at:iso(now())}).eq('id',n.dbId).then(()=>{});else save();render()}}
   const a=e.target.closest('[data-act]');if(!a)return;e.preventDefault();
   const f=actions[a.dataset.act];if(f)f(a.dataset.id,a.dataset.v,a);
 });
@@ -700,7 +807,7 @@ async function enter(session){
   const{data:ok,error}=await sb.rpc('is_member');
   if(error||!ok){entered=false;$('#aWho').textContent=myEmail;showAuth('aDenied');if(error)aMsg(error.message,'err');return}
   $('#auth').classList.add('hide');
-  if(await load()){subscribe();render();toast('Ciao '+(db.me.name||'')+'!')}
+  if(await load()){subscribe();render();toast('Ciao '+(db.me.name||'')+'!');await initPush();render();routeHash()}
 }
 $('#aSwitch').onclick=()=>{signup=!signup;$('#aSubmit').textContent=signup?'Crea l\'account':'Accedi';
   $('#aSwitch').textContent=signup?'Hai già un account? Accedi':'Prima volta? Crea l\'account';
