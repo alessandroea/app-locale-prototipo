@@ -1,0 +1,1315 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#F3F5F9" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0C1424" media="(prefers-color-scheme: dark)">
+<title>App Locale – V10 (archivio)</title>
+<link rel="apple-touch-icon" href="icon-v6-180.png">
+<link rel="icon" type="image/png" href="icon-v6-192.png">
+<meta name="apple-mobile-web-app-title" content="App Locale">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,650;12..96,800&display=swap">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+/* V08 prototipo – App Locale (Alessandro & Giovanni). V09: posizione per gli amici attiva di default, si spegne dal Profilo.
+   Nuova grafica: mappa a tutto schermo, pin "a segnale" colorati per urgenza, tema chiaro/scuro,
+   barra laterale su computer e iPad. Dati su Supabase (accesso, post, risposte, voti, conferme,
+   amicizie, avvisi, foto profilo). Gruppi e impostazioni restano demo su questo telefono. */
+:root{
+  --ink:#0F1B33;--paper:#F3F5F9;--surface:#FFFFFF;--surface2:#EEF1F7;--line:#E1E6EF;--mute:#5F6B85;
+  --cobalt:#3150F5;--cobalt-2:#1E2F9E;--on-cobalt:#FFFFFF;--live:#FFB020;
+  --alert:#E5484D;--warn:#E08A00;--calm:#1F9D63;--done:#8A94A8;
+  --shadow:0 18px 40px -18px rgba(15,27,51,.45),0 2px 8px -2px rgba(15,27,51,.12);
+  --display:"Bricolage Grotesque",-apple-system,system-ui,sans-serif;
+  --tab:68px;--rail:0px;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root{
+  --ink:#E9EEF8;--paper:#0C1424;--surface:#141E33;--surface2:#1C2842;--line:#26334F;--mute:#97A3BC;
+  --cobalt:#6C84FF;--cobalt-2:#3150F5;--on-cobalt:#0C1424;--done:#5D6880;
+  --shadow:0 18px 40px -18px rgba(0,0,0,.8),0 2px 8px -2px rgba(0,0,0,.5);
+  color-scheme:dark;
+}
+  .leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) brightness(.92) contrast(.88) saturate(.7)}
+  .leaflet-container{background:#0c1424}
+}
+*{box-sizing:border-box;min-width:0}
+html,body{height:100%;margin:0}
+body{font:16px/1.45 -apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif;color:var(--ink);background:var(--paper);overflow:hidden;-webkit-tap-highlight-color:transparent;-webkit-font-smoothing:antialiased}
+#map{position:fixed;inset:0;z-index:1;background:var(--surface2)}
+button{font:inherit;cursor:pointer;border:0;border-radius:14px;min-height:44px;padding:0 16px;color:inherit;background:none}
+input,textarea{font:inherit;font-size:16px;width:100%;border:1.5px solid var(--line);border-radius:14px;padding:13px 14px;background:var(--surface);color:var(--ink);transition:border-color .15s}
+input:focus,textarea:focus{border-color:var(--cobalt);outline:none}
+textarea{resize:none;min-height:96px}
+:focus-visible{outline:3px solid var(--cobalt);outline-offset:2px}
+.hide{display:none!important}
+h1,h3,.display{font-family:var(--display);letter-spacing:-.02em}
+a{color:var(--cobalt)}
+
+/* ---------- barra in alto sulla mappa ---------- */
+.top{position:fixed;z-index:10;left:calc(var(--rail) + 12px);right:12px;top:calc(env(safe-area-inset-top) + 10px);display:flex;gap:8px;align-items:center}
+.searchbar{flex:1;display:flex;align-items:center;gap:10px;height:52px;border-radius:26px;background:var(--surface);box-shadow:var(--shadow);color:var(--mute);text-align:left;padding:0 18px}
+.searchbar svg{width:20px;height:20px;flex:none;color:var(--ink)}
+.searchbar span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.round{width:52px;height:52px;padding:0;border-radius:50%;background:var(--surface);box-shadow:var(--shadow);display:grid;place-items:center;flex:none}
+.round svg{width:21px;height:21px}
+.round.on{background:var(--cobalt);color:var(--on-cobalt)}
+.topav{width:52px;height:52px;padding:0;border-radius:50%;flex:none;box-shadow:var(--shadow);display:grid;place-items:center;background:var(--surface)}
+.topav .av{width:46px;height:46px;font-size:16px}
+.sim{position:fixed;z-index:10;left:calc(50% + var(--rail)/2);transform:translateX(-50%);top:calc(env(safe-area-inset-top) + 118px);background:var(--cobalt);color:var(--on-cobalt);font-size:13px;font-weight:600;padding:7px 14px;border-radius:99px;white-space:nowrap}
+
+/* ---------- pannello "intorno a te" ---------- */
+.sheet{position:fixed;z-index:10;left:0;right:0;bottom:calc(var(--tab) + env(safe-area-inset-bottom));background:var(--surface);border-radius:28px 28px 0 0;box-shadow:0 -10px 40px -20px rgba(15,27,51,.5);padding:6px 16px 12px;max-height:46vh;display:flex;flex-direction:column}
+.grab{display:block;width:100%;min-height:22px;padding:0;margin:0 0 2px;border-radius:0}
+.grab::before{content:'';display:block;width:44px;height:5px;border-radius:3px;background:var(--line);margin:0 auto}
+.sheet>*{flex:none}
+.sheet{overflow-y:auto;overscroll-behavior:contain;transition:max-height .25s ease}
+.sheet.max{max-height:84vh}
+.sheet>.grab{position:sticky;top:-6px;background:var(--surface);z-index:2;margin-top:-6px;padding-top:6px;min-height:28px}
+.sheet.min .scroll-x,.sheet.min .list,.sheet.min .h,.sheet.min #friendsBox{display:none}
+.here{display:flex;align-items:center;gap:12px;width:100%;padding:4px 0 8px;text-align:left;border-radius:0;min-height:0}
+.here b{display:block;font-family:var(--display);font-size:22px;font-weight:650;letter-spacing:-.02em;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.here small{display:block;color:var(--mute);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.live{width:12px;height:12px;border-radius:50%;background:var(--live);flex:none;position:relative}
+.live::after{content:'';position:absolute;inset:-6px;border-radius:50%;border:2px solid var(--live);opacity:0;animation:ping 2.4s ease-out infinite}
+.h{font-family:var(--display);font-size:16px;font-weight:650;margin:10px 0 8px;display:flex;justify-content:space-between;align-items:baseline;gap:8px;letter-spacing:-.01em}
+.h span{font-family:-apple-system,system-ui,sans-serif;font-weight:400;color:var(--mute);font-size:13px;letter-spacing:0}
+.scroll-x{display:flex;gap:8px;overflow-x:auto;margin:0 -16px;padding:2px 16px 6px;scrollbar-width:none}
+.scroll-x::-webkit-scrollbar{display:none}
+.pc{flex:none;background:var(--surface2);border-radius:16px;padding:10px 12px;text-align:left;min-width:156px;max-width:210px;display:flex;flex-direction:column;gap:3px}
+.pc b{display:block;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.list{margin:0 -16px;padding:0 16px}
+.ask{position:sticky;bottom:0;box-shadow:0 -10px 20px -6px var(--surface);margin-top:10px;background:var(--cobalt);color:var(--on-cobalt);font-family:var(--display);font-weight:650;width:100%;min-height:54px;font-size:18px;border-radius:18px;display:flex;align-items:center;justify-content:center;gap:8px;letter-spacing:-.01em}
+.ask svg{width:20px;height:20px}
+
+/* ---------- barra delle sezioni ---------- */
+.tabs{position:fixed;z-index:15;left:0;right:0;bottom:0;height:calc(var(--tab) + env(safe-area-inset-bottom));padding-bottom:env(safe-area-inset-bottom);background:color-mix(in srgb,var(--surface) 88%,transparent);-webkit-backdrop-filter:saturate(1.6) blur(22px);backdrop-filter:saturate(1.6) blur(22px);border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(5,1fr)}
+.tabs button{border-radius:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:11px;font-weight:500;color:var(--mute);padding:0;position:relative}
+.tabs button i{display:grid;place-items:center;width:52px;height:30px;border-radius:15px;transition:background .2s}
+.tabs button.on{color:var(--cobalt);font-weight:650}
+.tabs button.on i{background:color-mix(in srgb,var(--cobalt) 14%,transparent)}
+.tabs svg{width:23px;height:23px}
+.badge{position:absolute;top:5px;left:calc(50% + 8px);background:var(--alert);color:#fff;font-size:11px;font-weight:700;border-radius:99px;min-width:19px;height:19px;padding:0 5px;display:grid;place-items:center;border:2px solid var(--surface)}
+
+/* ---------- sezioni a pagina intera ---------- */
+.view{position:fixed;z-index:12;left:var(--rail);right:0;top:0;bottom:calc(var(--tab) + env(safe-area-inset-bottom));background:var(--paper);overflow-y:auto;padding:calc(env(safe-area-inset-top) + 18px) 16px 28px}
+.view h1{font-size:36px;line-height:1.02;margin:6px 0 6px;font-weight:800}
+.sub{color:var(--mute);font-size:15px;margin:0 0 14px}
+.chips{display:flex;gap:6px;overflow-x:auto;margin:0 -16px 10px;padding:0 16px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex:none;min-height:38px;padding:0 15px;border-radius:99px;background:var(--surface);border:1px solid var(--line);font-size:14px;font-weight:500}
+.chip.on{background:var(--ink);border-color:var(--ink);color:var(--paper)}
+.card{display:block;width:100%;text-align:left;border:1px solid var(--line);border-radius:20px;padding:14px 16px;margin:0 0 10px;background:var(--surface)}
+.sheet .card{background:var(--surface);border-color:var(--line)}
+.card.res{opacity:.72}
+.who{display:flex;align-items:center;gap:10px;font-size:14px}
+.who b{font-weight:650}
+.av{width:34px;height:34px;border-radius:50%;display:inline-grid;place-items:center;color:#fff;font-weight:700;font-size:13px;flex:none;object-fit:cover;background:var(--surface2)}
+.av.lg{width:88px;height:88px;font-size:32px}
+img.av{display:inline-block}
+.meta{font-size:13px;color:var(--mute)}
+.ptxt{margin:10px 0 8px;font-weight:650;font-size:17px;line-height:1.3}
+.facts{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;font-size:13px;color:var(--mute)}
+.facts .tag{margin-right:-4px}
+.tag{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:650;padding:3px 9px;border-radius:99px;background:color-mix(in srgb,var(--alert) 12%,transparent);color:var(--alert);white-space:nowrap}
+.tag.news{background:color-mix(in srgb,var(--cobalt) 13%,transparent);color:var(--cobalt)}
+.tag.cat{background:var(--surface2);color:var(--ink);font-weight:500}
+.tag.u i{width:8px;height:8px;border-radius:50%;background:currentColor}
+.tag.u-alert{background:color-mix(in srgb,var(--alert) 12%,transparent);color:var(--alert)}
+.tag.u-warn{background:color-mix(in srgb,var(--warn) 14%,transparent);color:var(--warn)}
+.tag.u-calm{background:color-mix(in srgb,var(--calm) 13%,transparent);color:var(--calm)}
+.tag.done{background:var(--surface2);color:var(--done)}
+.st{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:650;white-space:nowrap}
+.st i{width:8px;height:8px;border-radius:50%;display:inline-block}
+.row{display:flex;align-items:center;gap:12px;padding:13px 0;border-bottom:1px solid var(--line)}
+.row>div{flex:1}
+.row:last-child{border-bottom:0}
+.sec-t{font-family:var(--display);font-size:18px;font-weight:650;margin:26px 0 8px;letter-spacing:-.01em}
+.box2{background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:2px 16px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:16px 0}
+.stats div{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:12px;text-align:center}
+.stats b{display:block;font-family:var(--display);font-size:28px;font-weight:800;letter-spacing:-.02em}
+.small{min-height:38px;padding:0 14px;font-size:14px;border-radius:12px;font-weight:600}
+.pri{background:var(--cobalt);color:var(--on-cobalt);font-weight:650}
+.pri:disabled{opacity:.6}
+.sec{background:var(--surface2);font-weight:600}
+.red{color:var(--alert)}
+.phase{display:inline-block;font-family:-apple-system,system-ui,sans-serif;font-size:11px;font-weight:650;color:#8a5a00;background:#fff1d6;padding:2px 8px;border-radius:99px;vertical-align:middle;letter-spacing:0}
+.sw{width:52px;height:32px;min-height:32px;border-radius:99px;background:var(--line);position:relative;padding:0;flex:none}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:26px;height:26px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:left .18s}
+.sw.on{background:var(--calm)}.sw.on::after{left:23px}
+
+/* profilo */
+.hero-me{display:flex;align-items:center;gap:16px;margin-top:8px}
+.avwrap{position:relative;flex:none;display:inline-block}
+.avwrap label{position:absolute;right:-2px;bottom:-2px;width:34px;height:34px;border-radius:50%;background:var(--cobalt);color:var(--on-cobalt);display:grid;place-items:center;cursor:pointer;border:3px solid var(--paper);margin:0}
+.avwrap label svg{width:16px;height:16px}
+.namebtn{padding:0;min-height:0;text-align:left;border-radius:6px}
+.namebtn h1{margin:0}
+
+/* ---------- finestre ---------- */
+.modal{position:fixed;z-index:20;inset:0;background:rgba(9,16,32,.42);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);display:flex;align-items:flex-end}
+.mbox{background:var(--surface);width:100%;max-height:90vh;overflow-y:auto;border-radius:28px 28px 0 0;padding:16px 18px calc(env(safe-area-inset-bottom) + 18px);animation:up .22s ease-out}
+.mbox h3{margin:8px 0 6px;font-size:25px;line-height:1.15;font-weight:800}
+.seg{display:flex;background:var(--surface2);border-radius:14px;padding:4px;gap:4px}
+.seg button{flex:1;min-height:40px;font-size:14px;color:var(--mute);padding:0 6px;border-radius:10px}
+.seg button.on{background:var(--surface);color:var(--ink);font-weight:650;box-shadow:0 1px 4px rgba(15,27,51,.14)}
+label{display:block;font-size:13px;font-weight:600;color:var(--mute);margin:16px 0 8px}
+.btns{display:flex;gap:8px;margin-top:16px}
+.btns>button{flex:1;min-height:50px}
+.ans{padding:12px 14px;background:var(--surface2);border-radius:18px;margin:8px 0}
+.ans.best{background:color-mix(in srgb,var(--calm) 11%,var(--surface));border:1px solid color-mix(in srgb,var(--calm) 35%,transparent)}
+.ans p{margin:8px 0 6px}
+.acts{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.acts button{min-height:36px;padding:0 12px;font-size:13px;font-weight:600;border-radius:99px;background:var(--surface);border:1px solid var(--line)}
+.ans .acts button{background:var(--surface)}
+.acts button.on{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.acts button.ok.on{background:var(--calm);border-color:var(--calm);color:#fff}
+.near{font-size:11px;font-weight:700;color:var(--calm);background:color-mix(in srgb,var(--calm) 13%,transparent);border-radius:99px;padding:2px 8px}
+.warn{font-size:13px;color:#8a5a00;background:#fff4e0;border-radius:12px;padding:9px 12px;margin-top:10px}
+.resbar{display:flex;align-items:center;gap:8px;margin-top:10px;padding:10px 12px;border-radius:14px;background:color-mix(in srgb,var(--calm) 12%,transparent);color:var(--calm);font-weight:650;font-size:14px}
+.rep{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:8px}
+.rep button{background:var(--surface2);font-size:14px;min-height:44px;display:flex;align-items:center;justify-content:center;gap:6px;padding:0 6px}
+.kv{display:grid;grid-template-columns:7.5em 1fr;gap:6px 12px;font-size:14px;margin-top:10px}
+.kv dt{color:var(--mute)}.kv dd{margin:0}
+.toast{position:fixed;z-index:30;left:calc(50% + var(--rail)/2);top:calc(env(safe-area-inset-top) + 120px);transform:translateX(-50%) translateY(-8px);background:var(--ink);color:var(--paper);padding:11px 18px;border-radius:99px;font-size:14px;font-weight:500;opacity:0;transition:opacity .2s,transform .2s;pointer-events:none;max-width:92vw;text-align:center;box-shadow:var(--shadow)}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.demo{font-size:12px;color:var(--mute);text-align:center;margin:16px 0 4px}
+.empty{color:var(--mute);padding:16px 0;font-size:15px}
+.loading{position:fixed;z-index:11;left:calc(50% + var(--rail)/2);transform:translateX(-50%);top:calc(env(safe-area-inset-top) + 120px);background:var(--surface);color:var(--ink);font-size:13px;font-weight:600;padding:7px 14px;border-radius:99px;box-shadow:var(--shadow)}
+
+/* ---------- segni sulla mappa ---------- */
+.me-pin{width:20px;height:20px;border-radius:50%;background:var(--cobalt);border:3px solid #fff;box-shadow:0 0 0 7px color-mix(in srgb,var(--cobalt) 22%,transparent)}
+.q-pin{--c:var(--calm);width:36px;height:36px;border-radius:50%;background:var(--c);border:3px solid #fff;box-shadow:0 4px 12px rgba(15,27,51,.35);display:grid;place-items:center;position:relative;color:#fff;font:800 15px/1 var(--display)}
+.q-pin.u-alert{--c:var(--alert)}.q-pin.u-warn{--c:var(--warn)}.q-pin.u-calm{--c:var(--calm)}.q-pin.res{--c:var(--done)}
+.q-pin.fresh::before,.q-pin.fresh::after{content:'';position:absolute;inset:-3px;border-radius:50%;border:3px solid var(--c);animation:ping 2.2s ease-out infinite}
+.q-pin.fresh::after{animation-delay:1.1s}
+.pl{display:inline-flex;align-items:center;gap:6px;background:var(--surface);color:var(--ink);border-radius:99px;padding:6px 11px 6px 8px;box-shadow:0 3px 10px rgba(15,27,51,.28);font:650 12px/1 -apple-system,system-ui,sans-serif;white-space:nowrap;transform:translate(-50%,-50%)}
+.pl i{width:10px;height:10px;border-radius:50%;background:#9aa4af}
+.pl b{background:var(--cobalt);color:var(--on-cobalt);border-radius:99px;padding:2px 7px;font-size:11px}
+.spot-pin{width:38px;height:38px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:var(--ink);border:3px solid #fff;box-shadow:0 3px 10px rgba(0,0,0,.35)}
+.leaflet-control-attribution{font-size:10px}
+@keyframes ping{0%{transform:scale(1);opacity:.75}100%{transform:scale(2.1);opacity:0}}
+@keyframes up{from{transform:translateY(24px);opacity:.6}to{transform:none;opacity:1}}
+
+/* ---------- accesso ---------- */
+.auth{position:fixed;z-index:40;inset:0;background:var(--paper);overflow-y:auto;display:flex;align-items:center;justify-content:center;padding:calc(env(safe-area-inset-top) + 24px) 20px calc(env(safe-area-inset-bottom) + 24px)}
+.abox{width:100%;max-width:400px}
+.abox h1{font-size:44px;line-height:1;margin:0 0 8px;font-weight:800}
+.logo{width:76px;height:76px;border-radius:20px;margin-bottom:20px;box-shadow:var(--shadow);display:block}
+.abox input{margin-top:8px}
+.big{width:100%;min-height:54px;font-size:17px;margin-top:12px;border-radius:16px}
+.gbtn{width:100%;min-height:54px;border:1.5px solid var(--line);background:var(--surface);font-weight:650;display:flex;align-items:center;justify-content:center;gap:10px;border-radius:16px}
+.gbtn svg{width:20px;height:20px}
+.or{display:flex;align-items:center;gap:10px;color:var(--mute);font-size:13px;margin:18px 0 4px}
+.or::before,.or::after{content:"";flex:1;height:1px;background:var(--line)}
+.link{min-height:40px;padding:0;color:var(--cobalt);font-size:15px;font-weight:600}
+.amsg{font-size:14px;margin:12px 0 0;min-height:20px}
+.amsg.err{color:var(--alert)}
+.amsg.ok{color:var(--calm)}
+/* V08 */
+.who[data-act],.pick{cursor:pointer}
+.pick{display:flex;align-items:center;gap:12px;flex:1;min-width:0}
+.fpin{position:relative;display:flex;flex-direction:column;align-items:center;gap:3px;transform:translate(-50%,-50%)}
+.fpin .av{width:44px;height:44px;border:3px solid #fff;box-shadow:0 4px 14px rgba(15,27,51,.4);font-size:15px}
+.fpin.on .av{border-color:var(--calm)}
+.fpin.on::before{content:'';position:absolute;top:-4px;width:52px;height:52px;border-radius:50%;border:3px solid var(--calm);animation:ping 2.4s ease-out infinite}
+.fpin b{font:650 11px/1 -apple-system,system-ui,sans-serif;background:var(--surface);color:var(--ink);padding:4px 7px;border-radius:99px;box-shadow:0 2px 6px rgba(15,27,51,.25);white-space:nowrap}
+.fchip{flex:none;display:flex;align-items:center;gap:8px;background:var(--surface2);border-radius:99px;padding:5px 14px 5px 5px;min-height:42px;text-align:left}
+.fchip .av{width:32px;height:32px;font-size:12px}
+.fchip small{display:block;color:var(--mute);font-size:12px}
+.locbox{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:16px;background:var(--surface2);margin-top:14px}
+.locbox>div{flex:1;min-width:0}
+.ldot{width:12px;height:12px;border-radius:50%;background:var(--done);flex:none}
+.ldot.on{background:var(--calm);box-shadow:0 0 0 5px color-mix(in srgb,var(--calm) 22%,transparent)}
+.pstats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:14px 0 4px}
+.pstats div{background:var(--surface2);border-radius:14px;padding:10px;text-align:center}
+.pstats b{display:block;font-family:var(--display);font-size:22px;font-weight:800}
+.composer{position:sticky;bottom:calc(-18px - env(safe-area-inset-bottom));background:var(--surface);margin:12px -18px 0;padding:10px 18px calc(env(safe-area-inset-bottom) + 12px);border-top:1px solid var(--line)}
+.composer textarea{min-height:64px}
+.composer .btns{margin-top:10px}
+.qbox{margin:0 0 8px}
+/* V10 */
+.aimg{display:block;width:100%;max-height:320px;object-fit:cover;border-radius:12px;margin:2px 0 8px;background:var(--surface)}
+.gav{border-radius:12px!important}
+.gmembers{display:flex;align-items:center;gap:0;margin:10px 0 4px}
+.gmembers .av{margin-left:-8px;box-shadow:0 0 0 2px var(--surface)}.gmembers .av:first-child{margin-left:0}
+.gmembers .meta{margin-left:10px}
+.swatches{display:flex;gap:10px;margin-top:8px}
+.swatches button{width:34px;height:34px;min-height:34px;border-radius:50%;padding:0;border:3px solid transparent}
+.swatches button.on{border-color:var(--ink)}
+.composer2{margin-top:14px;padding:12px;border-radius:16px;background:var(--surface2)}
+.composer2 textarea{background:var(--surface)}
+.gpost{cursor:pointer}
+.zone-row .meta b{font-weight:600}
+/* V09 */
+.mapf{position:fixed;z-index:9;left:calc(var(--rail) + 12px);top:calc(env(safe-area-inset-top) + 72px);display:flex;gap:6px}
+.mapf .chip{box-shadow:0 4px 14px -4px rgba(15,27,51,.35);border:0;min-height:36px;font-weight:600}
+.pimg{display:block;width:100%;aspect-ratio:16/10;object-fit:cover;border-radius:14px;margin:2px 0 10px;background:var(--surface2)}
+.timg{display:block;width:100%;max-height:60vh;object-fit:cover;border-radius:16px;margin:10px 0 4px;background:var(--surface2)}
+.photo-pick{display:flex;align-items:center;gap:10px;margin-top:10px}
+.photo-pick label{margin:0;display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:0 14px;border-radius:12px;background:var(--surface2);color:var(--ink);font-size:14px;font-weight:600;cursor:pointer}
+.photo-pick img{width:56px;height:56px;border-radius:12px;object-fit:cover}
+.photo-pick button{min-height:36px;padding:0 10px;font-size:13px;color:var(--alert)}
+.setup-av{margin:18px 0 2px}
+.at{position:relative}.at span{position:absolute;left:15px;top:50%;transform:translateY(-50%);color:var(--mute);font-weight:650;pointer-events:none}
+.at input{padding-left:32px;margin-top:0}
+.umsg{font-size:13px;margin:6px 0 0;color:var(--mute)}.umsg.ok{color:var(--calm)}.umsg.err{color:var(--alert)}
+.handle{font-size:15px;color:var(--mute);font-weight:500}
+
+/* ---------- tablet e computer ---------- */
+@media (max-width:380px){.round,.topav{width:46px;height:46px}.topav .av{width:40px;height:40px}.searchbar{height:46px;padding:0 14px}}
+@media (min-width:640px){
+  .sheet{left:16px;right:auto;width:420px;bottom:calc(var(--tab) + env(safe-area-inset-bottom) + 14px);border-radius:26px;max-height:58vh;box-shadow:var(--shadow)}
+  .top{right:auto;width:min(620px,calc(100vw - 32px))}
+  .modal{align-items:center;justify-content:center}
+  .mbox{max-width:560px;border-radius:28px;padding-bottom:20px}
+  .view{padding-inline:max(16px,calc(50% - 320px))}
+}
+@media (min-width:960px){
+  :root{--rail:88px;--tab:0px}
+  .tabs{top:0;right:auto;width:var(--rail);height:auto;padding:calc(env(safe-area-inset-top) + 18px) 0 0;grid-template-columns:1fr;grid-auto-rows:76px;align-content:start;border-top:0;border-right:1px solid var(--line)}
+  .tabs::before{content:'';display:block;width:44px;height:44px;margin:0 auto 14px;border-radius:12px;background:url(icon-v6-192.png) center/cover}
+  .sheet{left:calc(var(--rail) + 16px);bottom:16px;width:430px;max-height:calc(100vh - 110px)}
+  .top{left:calc(var(--rail) + 16px)}
+  .view{width:520px;right:auto;padding-inline:24px;border-right:1px solid var(--line);box-shadow:var(--shadow)}
+}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div id="map" aria-label="Mappa"></div>
+
+<!-- MAPPA -->
+<div id="mapUi">
+  <div class="top">
+    <button class="searchbar" data-act="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg><span>Cerca un posto</span></button>
+    <button class="round" data-act="locate" aria-label="Centra sulla mia posizione"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 3 3 10.5l7.5 2.6L13 21z"/></svg></button>
+    <button class="round" id="btnSim" data-act="sim" aria-label="Modalità prova: tocca la mappa per spostarti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/><circle cx="12" cy="12" r="5"/></svg></button>
+    <button class="topav" data-tab="me" id="topAv" aria-label="Il tuo profilo"></button>
+  </div>
+  <div class="mapf" id="mapF" role="group" aria-label="Cosa mostrare sulla mappa"><button class="chip on" data-act="mapF" data-id="all">Tutto</button><button class="chip" data-act="mapF" data-id="urgent">Urgenti</button><button class="chip" data-act="mapF" data-id="friends">Amici</button></div>
+  <div class="sim hide" id="simBadge">Modalità prova: tocca la mappa per spostarti</div>
+  <section class="sheet" id="sheet" aria-label="Intorno a te">
+    <button class="grab" data-act="sheet" aria-label="Riduci o espandi il pannello"></button>
+    <button class="here" data-act="here"><span class="live" aria-hidden="true"></span><span style="flex:1;min-width:0"><b id="placeName">Sto cercando dove sei…</b><small id="placeSub">Consenti l'accesso alla posizione</small></span></button>
+    <div class="h">Posti con stato live <span id="plCount"></span></div>
+    <div class="scroll-x" id="placesRow"></div>
+    <div id="friendsBox" class="hide"><div class="h">Amici sulla mappa <span id="fCount"></span></div><div class="scroll-x" id="friendsRow"></div></div>
+    <div class="h">Domande e notizie <span id="count"></span></div>
+    <div class="list" id="list"></div>
+    <button class="ask" data-act="ask"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Chiedi a chi è qui</button>
+  </section>
+</div>
+
+<section class="view hide" id="v-feed"></section>
+<section class="view hide" id="v-groups"></section>
+<section class="view hide" id="v-act"></section>
+<section class="view hide" id="v-me"></section>
+
+<nav class="tabs" aria-label="Sezioni">
+  <button data-tab="map" class="on"><i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14"/></svg></i>Mappa</button>
+  <button data-tab="feed"><i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="6" rx="2"/><rect x="4" y="14" width="16" height="6" rx="2"/></svg></i>Feed</button>
+  <button data-tab="groups"><i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3.2"/><circle cx="17" cy="9" r="2.5"/><path d="M3 19c.5-3.3 3-5 6-5s5.5 1.7 6 5M15 14.5c2.6-.3 5 1 5.6 4"/></svg></i>Gruppi</button>
+  <button data-tab="act"><i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M6 16V11a6 6 0 1 1 12 0v5l2 2H4zM10 20a2 2 0 0 0 4 0"/></svg></i>Attività<span class="badge hide" id="badge"></span></button>
+  <button data-tab="me"><i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/></svg></i>Profilo</button>
+</nav>
+
+<div class="modal hide" id="modal" role="dialog" aria-modal="true"><div class="mbox" id="mbox"></div></div>
+<div class="toast" id="toast" role="status"></div>
+<div class="loading hide" id="loading">Aggiorno…</div>
+<input type="file" id="avFile" accept="image/*" class="hide">
+
+<!-- ACCESSO -->
+<div class="auth" id="auth">
+  <div class="abox">
+    <img class="logo" src="icon-v6-192.png" alt="">
+    <h1>App Locale</h1>
+    <p class="sub">Chiedi a chi è lì. Prototipo in prova: entra con Google o crea un account con la tua email.</p>
+    <div id="aMain">
+      <button class="gbtn" id="aGoogle" type="button"><svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>Continua con Google</button>
+      <div class="or">oppure con email</div>
+      <form id="aForm">
+        <input type="email" id="aEmail" placeholder="Email" autocomplete="email" required>
+        <input type="password" id="aPass" placeholder="Password (almeno 6 caratteri)" autocomplete="current-password" minlength="6" required>
+        <button class="pri big" id="aSubmit">Accedi</button>
+      </form>
+      <div style="display:flex;justify-content:space-between;gap:8px;margin-top:6px">
+        <button class="link" id="aSwitch" type="button">Prima volta? Crea l'account</button>
+        <button class="link" id="aForgot" type="button">Password dimenticata?</button>
+      </div>
+    </div>
+    <form id="aSetup" class="hide" novalidate>
+      <p style="font-family:var(--display);font-size:24px;font-weight:650;margin:4px 0 4px;letter-spacing:-.01em">Completa il profilo</p>
+      <p class="meta">Così gli altri sanno chi chiede e chi risponde. Puoi cambiare tutto dopo, dal Profilo.</p>
+      <div class="setup-av"><div class="avwrap" id="sAv"></div></div>
+      <label for="sName">Nome</label>
+      <input id="sName" maxlength="40" autocomplete="name" required>
+      <label for="sUser">Nome utente</label>
+      <div class="at"><span>@</span><input id="sUser" maxlength="20" autocapitalize="none" autocorrect="off" spellcheck="false" inputmode="email" required></div>
+      <p class="umsg" id="sUserMsg">Da 3 a 20 caratteri: lettere minuscole, numeri, punto e trattino basso.</p>
+      <div class="row" style="margin-top:14px;border:0;padding:0"><div><b>Mostra la mia posizione agli amici</b><div class="meta">Solo i tuoi amici ti vedono sulla mappa. Puoi spegnerla quando vuoi.</div></div><button type="button" class="sw on" id="sShare" role="switch" aria-checked="true" aria-label="Mostra la mia posizione agli amici"></button></div>
+      <button class="pri big" id="sSave">Entra nell'app</button>
+    </form>
+    <form id="aNewPass" class="hide">
+      <label for="aPass2">Scegli una nuova password</label>
+      <input type="password" id="aPass2" minlength="6" autocomplete="new-password" required>
+      <button class="pri big">Salva la nuova password</button>
+    </form>
+    <div id="aDenied" class="hide">
+      <p>L'account <b id="aWho"></b> non ha accesso al prototipo.</p>
+      <p class="meta">Le registrazioni ora sono chiuse oppure l'accesso è stato tolto. Chiedi ad Alessandro o Giovanni di abilitarti, oppure esci e riprova con un altro account.</p>
+      <button class="sec big" id="aOut" type="button">Esci</button>
+    </div>
+    <p class="amsg" id="aMsg" role="status"></p>
+    <p class="demo">Prototipo V10</p>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+{
+const KEY='applocale_v04_local', M=60e3, H=3600e3;
+/* ---------- Supabase (chiave pubblica: protetta dalle regole RLS del database) ---------- */
+const SB_URL='https://tigxpqmedwlwthomvunb.supabase.co';
+const SB_KEY='sb_publishable_np6dcaeo0Hbbd63wlzb1FQ_Nz5_ryoU';
+const APP_URL=location.origin+location.pathname;
+const sb=supabase.createClient(SB_URL,SB_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+let myId=null,myEmail='',PROF={},FR=[],NOTIFS=[],LOC={},GROUPS=[],GMEM=[],GPOSTS=[],ZONES=[];
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const now=()=>Date.now();
+
+/* ---------- utenti di esempio ---------- */
+const U={
+  giulia:{n:'Giulia R.',c:'#e5484d',rep:420,b:'Local Hero'},
+  mark:{n:'Mark TW10',c:'#2f6fe4',rep:310,b:'Esperto di Richmond'},
+  priya:{n:'Priya K.',c:'#8e4ec6',rep:180},
+  tom:{n:'Tom (Kew)',c:'#12a594',rep:95},
+  sara:{n:'Sara runs',c:'#f76b15',rep:260,b:'Runner'},
+  ben:{n:'Ben L.',c:'#3e63dd',rep:60},
+  fede:{n:'Fede84',c:'#d6409f',rep:140},
+  hannah:{n:'Hannah P.',c:'#0d74ce',rep:75}
+};
+const REP={tranquillo:{l:'Tranquillo',c:'#30a46c'},affollato:{l:'Affollato',c:'#f76b15'},coda:{l:'Coda',c:'#e5484d'},
+  evento:{l:'Evento',c:'#8e4ec6'},ritardi:{l:'Ritardi',c:'#e5484d'},chiuso:{l:'Chiuso',c:'#6b7785'}};
+const CATS={emergenza:'Emergenza',traffico:'Traffico',trasporti:'Trasporti',info:'Servizi e info',eventi:'Eventi',natura:'Natura',sport:'Sport',cibo:'Cibo'};
+/* urgenza (dal documento di Giovanni): rosso emergenza, giallo viabilità e servizi, verde vita locale */
+const URG={emergenza:'alert',traffico:'warn',trasporti:'warn',info:'warn',eventi:'calm',natura:'calm',sport:'calm',cibo:'calm'};
+const URG_L={alert:'Urgente',warn:'Viabilità e servizi',calm:'Vita locale'};
+const urgOf=p=>URG[p.cat]||'warn';
+
+/* ---------- dati demo SOLO locali (gruppi, notifiche, amici, impostazioni) ----------
+   Luoghi, domande e risposte di esempio ora sono nel database (supabase/02_seed_demo.sql). */
+function seed(){
+  const t=now(), ago=m=>t-m*M;
+  const G=(id,name,mem,desc,col,gp)=>({id,name,members:mem,desc,c:col,joined:false,posts:gp.map(([by,text,m,r])=>({id:uid(),by,text,t:ago(m),replies:r,demo:true}))});
+  const groups=[
+    G('tennis','Tennis a Richmond',128,'Campi liberi, compagni di gioco e tornei in zona.','#30a46c',[['mark','Qualcuno per un doppio domenica mattina al Old Deer Park?',90,4],['giulia','I campi coperti sono pieni fino a gennaio, prenotate presto.',600,7]]),
+    G('run','Runner di Richmond Park',342,'Giri del parco, gruppi del sabato, sicurezza al buio.','#f76b15',[['sara','Giro da 11 km sabato alle 8 da Roehampton Gate, ritmo tranquillo.',180,12],['ben','Attenzione: Tamsin Trail fangoso dopo la pioggia.',1400,3]]),
+    G('ita','Italiani a Londra Sud-Ovest',517,'Consigli, eventi e ritrovi per italiani tra Richmond, Putney e Kingston.','#2f6fe4',[['fede','Aperitivo italiano venerdì a Putney, chi viene?',75,15],['giulia','Dove trovate il panettone buono in zona?',900,22]]),
+    G('pesca','Pesca sul Tamigi',64,'Spot, permessi e maree tra Teddington e Kew.','#12a594',[['tom','Con la bassa marea a Ham ottimi spot per lucci.',2000,2]]),
+    G('gen','Genitori TW9 / TW10',211,'Scuole, parchi giochi, attività per bambini.','#d6409f',[['hannah','Il parco giochi di Petersham è aperto dopo i lavori.',300,6]]),
+    G('rugby','Rugby a Twickenham',389,'Partite, biglietti, come arrivare e dove guardarle.','#3e63dd',[['mark','Pub consigliati per vedere la partita se non avete il biglietto?',240,18]])
+  ];
+  const notifs=[
+    {id:uid(),text:'Nuova domanda vicino a te: “Barriere giù da 12 minuti…”',t:ago(8),read:false,post:'419f340c-39f6-4804-8cff-61d7f1d0e77f'},
+    {id:uid(),text:'Sara runs vuole essere tua amica',t:ago(50),read:false,tab:'me'},
+    {id:uid(),text:'Molto votata intorno a te: “District line sospesa…”',t:ago(15),read:false,post:'fd7ef139-0be4-4d1e-82d4-799267b79a3e'},
+    {id:uid(),text:'Benvenuto! Le conversazioni con il bollino Esempio sono demo, le altre sono vostre.',t:ago(1),read:false}
+  ];
+  return{v:4,seededAt:t,groups,notifs,follow:[],blocked:[],
+    friends:{giulia:'friend',mark:'friend',sara:'request'},
+    me:{name:'',anon:false,precision:'200',radius:'1000',quiet:true,areas:['Richmond','Putney'],points:0}};
+}
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+
+/* ---------- salvataggio ---------- */
+// db.places e db.posts arrivano dal database; il resto è locale (questo telefono).
+let db;
+try{db=JSON.parse(localStorage.getItem(KEY))}catch(e){}
+if(!db||db.v!==4)db=seed();
+else{ // sposta i dati demo locali in avanti, così sembrano sempre "live"
+  const d=now()-db.seededAt;
+  db.groups.forEach(g=>g.posts.forEach(x=>{if(x.demo)x.t+=d}));
+  db.seededAt=now();
+}
+db.places=[];db.posts=[];db.follow=db.follow||[];db.blocked=db.blocked||[];
+const save=()=>{try{const{places,posts,...loc}=db;localStorage.setItem(KEY,JSON.stringify(loc))}catch(e){}};
+save();
+
+/* ---------- lettura dal database ---------- */
+const iso=ms=>new Date(ms).toISOString();
+async function load(){
+  $('#loading').classList.remove('hide');
+  const since=iso(now()-6*H);
+  const [pl,rp,po,an,vo,pr,fr,nt,rx,lc,gr,gm,gp,zn]=await Promise.all([
+    sb.from('places').select('id,name,category,lat,lng,info'),
+    sb.from('place_reports').select('place_id,status,is_demo,demo_offset_min,created_at').or(`is_demo.eq.true,created_at.gt.${since}`),
+    sb.from('posts').select('id,kind,category,place_id,place_label,lat,lng,radius_m,body,author_id,demo_author,is_demo,demo_offset_min,base_votes,base_confirms,best_answer_id,created_at,expires_at,photo_url').or(`is_demo.eq.true,expires_at.gt.${since}`),
+    sb.from('answers').select('id,post_id,body,distance_m,author_id,demo_author,is_demo,demo_offset_min,base_votes,created_at,photo_url'),
+    sb.from('votes').select('user_id,post_id,answer_id'),
+    sb.from('profiles').select('id,display_name,color,avatar_url,username,share_location,share_precision,alerts_nearby,alert_radius_m'),
+    sb.from('friendships').select('id,requester_id,addressee_id,status'),
+    sb.from('notifications').select('id,kind,post_id,group_id,body,read_at,created_at').order('created_at',{ascending:false}).limit(100),
+    sb.from('post_reactions').select('post_id,user_id,kind'),
+    sb.from('locations').select('user_id,lat,lng,accuracy_m,precision,share_until,updated_at'),
+    sb.from('groups').select('id,name,description,color,place_label,created_by,created_at'),
+    sb.from('group_members').select('group_id,user_id,role,joined_at'),
+    sb.from('group_posts').select('id,group_id,parent_id,author_id,body,photo_url,created_at').order('created_at',{ascending:false}).limit(1000),
+    sb.from('followed_zones').select('id,name,lat,lng,radius_m,created_at').order('created_at')
+  ]);
+  $('#loading').classList.add('hide');
+  const err=[pl,rp,po,an,vo,pr,fr,nt,rx,lc,gr,gm,gp,zn].find(r=>r.error);
+  if(err){toast('Errore dal database: '+err.error.message);return false}
+  PROF={};pr.data.forEach(p=>PROF[p.id]={n:p.display_name,c:p.color,a:p.avatar_url,u:p.username,sh:p.share_location!==false,sp:p.share_precision||'exact',al:p.alerts_nearby!==false,ar:p.alert_radius_m||1000});
+  GROUPS=gr.data;GMEM=gm.data;GPOSTS=gp.data.map(x=>({...x,t:Date.parse(x.created_at)}));ZONES=zn.data;
+  if(PROF[myId]){db.me.name=PROF[myId].n}
+  LOC={};lc.data.forEach(l=>{const until=l.share_until?Date.parse(l.share_until):null;LOC[l.user_id]={lat:l.lat,lng:l.lng,acc:l.accuracy_m,area:l.precision==='area',until,t:Date.parse(l.updated_at)}});
+  FR=fr.data.map(f=>({id:f.id,other:f.requester_id===myId?f.addressee_id:f.requester_id,status:f.status,incoming:f.addressee_id===myId}));
+  NOTIFS=nt.data.map(n=>({id:'db'+n.id,dbId:n.id,text:n.body,t:Date.parse(n.created_at),read:!!n.read_at,post:n.post_id,group:n.group_id,tab:n.kind.startsWith('friend')?'me':null}));
+  const T=r=>r.is_demo?now()-(r.demo_offset_min||0)*M:Date.parse(r.created_at);
+  const who=r=>r.author_id?(r.author_id===myId?'me':r.author_id):r.demo_author;
+  const vP={},vA={},myP=new Set(),myA=new Set();
+  vo.data.forEach(v=>{if(v.post_id){vP[v.post_id]=(vP[v.post_id]||0)+1;if(v.user_id===myId)myP.add(v.post_id)}
+    if(v.answer_id){vA[v.answer_id]=(vA[v.answer_id]||0)+1;if(v.user_id===myId)myA.add(v.answer_id)}});
+  db.places=pl.data.map(p=>({id:p.id,name:p.name,cat:p.category,lat:p.lat,lng:p.lng,info:p.info||[],
+    reports:rp.data.filter(r=>r.place_id===p.id).map(r=>({type:r.status,t:T(r),demo:r.is_demo}))}));
+  const blocked=new Set(db.blocked);
+  const RX={};rx.data.forEach(r=>{const o=RX[r.post_id]||(RX[r.post_id]={confirm:new Set(),resolved:new Set()});o[r.kind].add(r.user_id)});
+  db.posts=po.data.map(p=>{const t=T(p),dur=Date.parse(p.expires_at)-Date.parse(p.created_at),x=RX[p.id]||{confirm:new Set(),resolved:new Set()};
+    return{id:p.id,type:p.kind,cat:p.category,placeId:p.place_id,lat:p.lat,lng:p.lng,place:p.place_label,by:who(p),mine:p.author_id===myId,
+      text:p.body,photo:p.photo_url,t,exp:p.is_demo?t+dur:Date.parse(p.expires_at),radius:p.radius_m,
+      confirms:(p.base_confirms||0)+x.confirm.size,myConfirm:x.confirm.has(myId),resolves:x.resolved.size,myResolve:x.resolved.has(myId),
+      resolved:(p.author_id&&x.resolved.has(p.author_id))||x.resolved.size>=2,
+      votes:p.base_votes+(vP[p.id]||0),voted:myP.has(p.id),follow:db.follow.includes(p.id)||p.author_id===myId,demo:p.is_demo,
+      answers:an.data.filter(a=>a.post_id===p.id&&!blocked.has(who(a))).map(a=>({id:a.id,by:who(a),text:a.body,photo:a.photo_url,t:T(a),d:a.distance_m,
+        votes:a.base_votes+(vA[a.id]||0),voted:myA.has(a.id),best:a.id===p.best_answer_id,demo:a.is_demo}))}})
+    .filter(p=>!blocked.has(p.by));
+  return true;
+}
+let reloadT=null;
+function reloadSoon(){clearTimeout(reloadT);reloadT=setTimeout(async()=>{if(await load()){render();refreshModal()}},400)}
+function refreshModal(){
+  if(modalKind==='thread'&&openId){const ta=$('#ansText');if((!ta||!ta.value)&&!ansPhoto)openThread(openId)}
+  if((modalKind==='group'||modalKind==='gpost')&&openId){const ta=$('#gText');if((!ta||!ta.value)&&!gPhoto)(modalKind==='group'?openGroup:openGPost)(openId)}
+  if(modalKind==='place'&&openId)openPlace(openId);
+  if(modalKind==='profile'&&openId)openProfile(openId);
+}
+async function run(promise,okMsg){
+  const{data,error}=await promise;
+  if(error){toast('Non salvato: '+error.message);return null}
+  if(okMsg)toast(okMsg);
+  await load();render();return data??true;
+}
+
+/* ---------- tempo reale: le novità arrivano subito; gli avvisi li crea il database ---------- */
+function subscribe(){
+  const ch=sb.channel('app-locale-live');
+  ['posts','answers','votes','place_reports','friendships','post_reactions','profiles','locations','groups','group_members','group_posts'].forEach(t=>ch.on('postgres_changes',{event:'*',schema:'public',table:t},()=>reloadSoon()));
+  ch.on('postgres_changes',{event:'INSERT',schema:'public',table:'notifications',filter:'user_id=eq.'+myId},e=>{toast(String(e.new.body||'Nuovo avviso').slice(0,90));reloadSoon()});
+  ch.subscribe();
+}
+
+/* ---------- notifiche push sul telefono ---------- */
+const isIOS=/iP(hone|ad|od)/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+const standalone=matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
+const PUSH_OK='serviceWorker' in navigator&&'PushManager' in window&&'Notification' in window;
+let swReg=null,pushState='unsupported';
+const b64u=str=>{const p='='.repeat((4-str.length%4)%4),b=atob((str+p).replace(/-/g,'+').replace(/_/g,'/'));return Uint8Array.from(b,c=>c.charCodeAt(0))};
+async function saveSub(sub){const j=sub.toJSON();
+  return sb.rpc('save_push_subscription',{p_endpoint:j.endpoint,p_p256dh:j.keys.p256dh,p_auth:j.keys.auth,p_user_agent:navigator.userAgent})}
+async function initPush(){
+  if(!('serviceWorker' in navigator)){pushState='unsupported';return}
+  try{swReg=await navigator.serviceWorker.register('sw.js')}catch(e){pushState='unsupported';return}
+  navigator.serviceWorker.addEventListener('message',e=>{if(e.data&&e.data.type==='open'){location.hash=new URL(e.data.url).hash;routeHash()}});
+  await refreshPush();
+}
+async function refreshPush(){
+  if(!PUSH_OK||!swReg){pushState=isIOS&&!standalone?'ios-home':'unsupported';return}
+  if(Notification.permission==='denied'){pushState='denied';return}
+  const sub=await swReg.pushManager.getSubscription();
+  pushState=sub&&Notification.permission==='granted'?'on':'off';
+  if(pushState==='on')saveSub(sub); // tiene aggiornato il telefono nel database
+}
+const pushTxt=()=>({on:'Attive su questo telefono: ricevi un avviso anche ad app chiusa',
+  off:'Ricevi un avviso quando qualcuno risponde o ti scrive, anche ad app chiusa',
+  'ios-home':'Su iPhone: tocca Condividi → “Aggiungi alla schermata Home”, apri App Locale dall’icona, accedi e torna qui',
+  denied:'Bloccate: riattivale da Impostazioni → Notifiche → App Locale',
+  unsupported:'Questo browser non supporta le notifiche push'})[pushState];
+function clearBadge(){try{navigator.clearAppBadge&&navigator.clearAppBadge()}catch(e){}}
+
+/* ---------- posizione per gli amici: attiva di default, si spegne dal Profilo ---------- */
+let myAcc=null,lastShare=null,geoDenied=false;
+const wantShare=()=>!!myId&&(PROF[myId]||{}).sh!==false;
+const mySharing=()=>{const l=LOC[myId];return wantShare()&&!!(l&&(!l.until||l.until>now()))};
+const isLive=l=>now()-l.t<5*M;
+let lastAlert=null;
+const wantAlerts=()=>!!myId&&(PROF[myId]||{}).al!==false;
+function maybeAlert(force){ // solo per gli avvisi: il database tiene la zona (~100 m), nessuno la vede
+  if(!myId||!me||!wantAlerts())return;
+  const moved=lastAlert?dist(lastAlert,me):1e9,age=lastAlert?now()-lastAlert.t:1e9;
+  if(!force&&moved<300&&age<10*M)return;
+  lastAlert={lat:me.lat,lng:me.lng,t:now()};
+  sb.rpc('set_alert_position',{p_lat:me.lat,p_lng:me.lng}).then(()=>{});
+}
+function maybeShare(force){
+  maybeAlert(force);
+  if(!myId||!me||!wantShare())return;
+  const moved=lastShare?dist(lastShare,me):1e9,age=lastShare?now()-lastShare.t:1e9;
+  if(!force&&moved<120&&age<60e3)return;
+  lastShare={lat:me.lat,lng:me.lng,t:now()};
+  sb.rpc('share_location',{p_lat:me.lat,p_lng:me.lng,p_accuracy:Math.round(myAcc||30),p_precision:(PROF[myId]||{}).sp||'exact',p_hours:0}).then(()=>{});
+}
+setInterval(()=>{lastShare&&(lastShare.t=0);maybeShare()},120e3);
+const geoCache={};
+async function placeName(lat,lng){
+  const k=lat.toFixed(3)+','+lng.toFixed(3);if(geoCache[k])return geoCache[k];
+  try{const r=await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=16&accept-language=it`);const j=await r.json(),a=j.address||{};
+    return geoCache[k]=[a.road||a.pedestrian||a.neighbourhood||a.suburb,a.city||a.town||a.village].filter(Boolean).join(', ')||'Posizione sulla mappa'}catch(e){return 'Posizione sulla mappa'}
+}
+function friendLocs(){return Object.entries(LOC).filter(([id])=>id!==myId).map(([id,l])=>({id,...l}))}
+
+/* ---------- nome utente: formato e disponibilità ---------- */
+const U_RE=/^[a-z0-9._]{3,20}$/;
+const slug=t=>String(t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'.').replace(/^[.]+|[.]+$/g,'').slice(0,20);
+async function checkUser(u,msg){
+  const say=(t,k)=>{msg.textContent=t;msg.className='umsg '+(k||'')};
+  if(!U_RE.test(u)){say('Da 3 a 20 caratteri: lettere minuscole, numeri, punto e trattino basso.','err');return false}
+  const{data,error}=await sb.rpc('username_available',{p_username:u});
+  if(error){say('Non riesco a controllarlo ora, riprova.','err');return false}
+  if(!data){say('@'+u+' è già preso, prova un altro.','err');return false}
+  say('@'+u+' è libero ✓','ok');return true;
+}
+function watchUser(input,msg){let t=null;
+  input.addEventListener('input',()=>{const v=input.value.toLowerCase().replace(/[^a-z0-9._]/g,'');if(v!==input.value)input.value=v;
+    clearTimeout(t);t=setTimeout(()=>checkUser(v,msg),450)})}
+
+const CAM='<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>';
+let ansPhoto=null,gPhoto=null;
+function bindPhoto(box,onChange,initial,label){ // scelta foto con anteprima; la foto viene ridotta (e perde i dati GPS dello scatto)
+  if(!box)return;let blob=initial||null;
+  const draw=()=>{box.innerHTML=blob?`<img src="${URL.createObjectURL(blob)}" alt="Anteprima"><span class="meta">Foto pronta</span><button type="button">Togli</button>`
+      :`<label>${CAM}${label||'Aggiungi una foto'}<input type="file" accept="image/*" class="hide"></label>`;
+    const b=box.querySelector('button');if(b)b.onclick=()=>{blob=null;onChange(null);draw()};
+    const inp=box.querySelector('input');if(inp)inp.onchange=async()=>{const f=inp.files[0];inp.value='';if(!f)return;
+      try{blob=await fitJpeg(f,1280);onChange(blob);draw()}catch(e){toast('Questa immagine non si apre, provane un\'altra')}}};
+  draw();
+}
+async function uploadPhoto(blob){
+  const path=`${myId}/${Date.now()}.jpg`,up=await sb.storage.from('post-photos').upload(path,blob,{contentType:'image/jpeg',cacheControl:'31536000'});
+  if(up.error){toast('Foto non caricata: '+up.error.message);return null}
+  return sb.storage.from('post-photos').getPublicUrl(path).data.publicUrl;
+}
+const inZones=p=>ZONES.some(z=>dist(p,z)<=z.radius_m);
+async function fitJpeg(file,max=1280){
+  const img=await new Promise((ok,ko)=>{const i=new Image();i.onload=()=>ok(i);i.onerror=ko;i.src=URL.createObjectURL(file)});
+  const k=Math.min(1,max/Math.max(img.naturalWidth,img.naturalHeight)),c=document.createElement('canvas');
+  c.width=Math.round(img.naturalWidth*k);c.height=Math.round(img.naturalHeight*k);c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+  URL.revokeObjectURL(img.src);return new Promise(ok=>c.toBlob(ok,'image/jpeg',.82));
+}
+/* ---------- foto profilo: ritaglio quadrato 320 px, JPEG, nella cartella dell'utente ---------- */
+async function squareJpeg(file,size=320){
+  const img=await new Promise((ok,ko)=>{const i=new Image();i.onload=()=>ok(i);i.onerror=ko;i.src=URL.createObjectURL(file)});
+  const s=Math.min(img.naturalWidth,img.naturalHeight),c=document.createElement('canvas');c.width=c.height=size;
+  c.getContext('2d').drawImage(img,(img.naturalWidth-s)/2,(img.naturalHeight-s)/2,s,s,0,0,size,size);
+  URL.revokeObjectURL(img.src);
+  return new Promise(ok=>c.toBlob(ok,'image/jpeg',.86));
+}
+$('#avFile').addEventListener('change',async e=>{
+  const f=e.target.files[0];e.target.value='';if(!f||!myId)return;
+  toast('Carico la foto…');
+  try{
+    const blob=await squareJpeg(f),path=`${myId}/${Date.now()}.jpg`;
+    const up=await sb.storage.from('avatars').upload(path,blob,{contentType:'image/jpeg',cacheControl:'31536000'});
+    if(up.error){toast('Foto non caricata: '+up.error.message);return}
+    const url=sb.storage.from('avatars').getPublicUrl(path).data.publicUrl,old=(PROF[myId]||{}).a;
+    if(await run(sb.from('profiles').update({avatar_url:url}).eq('id',myId),'Foto profilo aggiornata')){
+      const m=old&&old.match(/\/avatars\/(.+)$/);if(m)sb.storage.from('avatars').remove([m[1]]);
+      if(!$('#aSetup').classList.contains('hide'))drawSetupAv();
+    }
+  }catch(err){toast('Questa immagine non si apre, provane un\'altra')}
+});
+
+/* ---------- apertura da una notifica: #post=… o #tab=… ---------- */
+function routeHash(){
+  const h=location.hash,m=h.match(/post=([0-9a-f-]{36})/),t=h.match(/tab=(map|feed|groups|act|me)/),g=h.match(/group=([0-9a-f-]{36})/);
+  if(!m&&!t&&!g)return;
+  history.replaceState(null,'',location.pathname+location.search);
+  if(t)setTab(t[1]);
+  if(g){setTab('groups');if(GROUPS.some(x=>x.id===g[1]))openGroup(g[1]);else load().then(ok=>{if(ok){render();openGroup(g[1])}})}
+  if(m){if(db.posts.some(p=>p.id===m[1]))openThread(m[1]);else load().then(ok=>{if(ok){render();openThread(m[1])}})}
+}
+window.addEventListener('hashchange',()=>{if(myId)routeHash()});
+
+/* ---------- utilità ---------- */
+function dist(a,b){const R=6371000,r=x=>x*Math.PI/180,dLa=r(b.lat-a.lat),dLo=r(b.lng-a.lng);
+  const h=Math.sin(dLa/2)**2+Math.cos(r(a.lat))*Math.cos(r(b.lat))*Math.sin(dLo/2)**2;return 2*R*Math.asin(Math.sqrt(h))}
+const fmtD=m=>m<1000?Math.max(10,Math.round(m/10)*10)+' m':(m/1000).toFixed(m<10000?1:0).replace('.',',')+' km';
+function ago(t){const s=(now()-t)/1000;if(s<60)return'adesso';if(s<3600)return Math.floor(s/60)+' min fa';if(s<86400)return Math.floor(s/3600)+' h fa';return Math.floor(s/86400)+' g fa'}
+function left(t){const m=(t-now())/M;return m<60?Math.max(1,Math.round(m))+' min':Math.round(m/60)+' h'}
+function toast(t){const e=$('#toast');e.textContent=t;e.classList.add('show');clearTimeout(e._t);e._t=setTimeout(()=>e.classList.remove('show'),2400)}
+const alive=()=>db.posts.filter(p=>p.exp>now());
+const meU=()=>({n:db.me.name||'Io',c:(PROF[myId]||{}).c||'#3150F5',a:(PROF[myId]||{}).a});
+const user=id=>id==='me'?meU():U[id]||PROF[id]||{n:'Utente',c:'#6b7785'};
+const ini=n=>(String(n).match(/[\p{L}\p{N}]+/gu)||['?']).map(w=>w[0]).join('').slice(0,2).toUpperCase();
+const av=(id,cls='')=>{const u=user(id);return u.a?`<img class="av ${cls}" src="${esc(u.a)}" alt="" loading="lazy">`:`<span class="av ${cls}" style="background:${u.c}">${esc(ini(u.n))}</span>`};
+const placeOf=p=>db.places.find(x=>x.id===p.placeId);
+const isFriend=by=>by==='me'||db.friends[by]==='friend'||FR.some(f=>f.status==='accepted'&&f.other===by);
+function status(pl){const r=pl.reports.filter(x=>now()-x.t<60*M);if(!r.length)return null;
+  const c={};r.forEach(x=>c[x.type]=(c[x.type]||0)+1);const type=Object.keys(c).sort((a,b)=>c[b]-c[a])[0];
+  return{type,n:r.length,last:Math.max(...r.map(x=>x.t))}}
+const stHtml=pl=>{const s=status(pl);return s?`<span class="st" style="color:${REP[s.type].c}"><i style="background:${REP[s.type].c}"></i>${REP[s.type].l}</span>`:'<span class="st" style="color:var(--mute)"><i style="background:#c3cad2"></i>Nessuna segnalazione</span>'};
+const myPoints=()=>{let p=0;db.posts.forEach(x=>{if(x.by==='me')p+=5+x.votes*2;x.answers.forEach(a=>{if(a.by==='me')p+=10+a.votes*2+(a.best?15:0)})});return p};
+
+/* ---------- mappa ---------- */
+const map=L.map('map',{zoomControl:false}).setView([51.4613,-0.3063],14);
+let tileErr=0,switched=false;
+const osm=L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'}).addTo(map);
+osm.on('tileerror',()=>{if(++tileErr>4&&!switched){switched=true;map.removeLayer(osm);
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'Tiles © Esri'}).addTo(map)}});
+const layer=L.layerGroup().addTo(map);
+const meIcon=L.divIcon({className:'',html:'<div class="me-pin"></div>',iconSize:[18,18],iconAnchor:[9,9]});
+let me=null,meMarker=null,accCircle=null,simMode=false,gpsPos=null,followed=false,placeLabel='Posizione attuale',lastLook=null;
+
+function setMe(lat,lng,acc,sim){
+  me={lat,lng};myAcc=acc;maybeShare();
+  if(!meMarker){meMarker=L.marker([lat,lng],{icon:meIcon,zIndexOffset:1000}).addTo(map);accCircle=L.circle([lat,lng],{radius:acc||30,color:'#1677ff',weight:1,fillOpacity:.08,interactive:false}).addTo(map)}
+  else{meMarker.setLatLng([lat,lng]);accCircle.setLatLng([lat,lng])}
+  accCircle.setRadius(sim?15:Math.min(acc||30,300));
+  if(!followed){followed=true;
+    const far=dist(me,{lat:51.4613,lng:-0.3063})>20000;
+    if(far)toast('Sei lontano da Richmond: i dati di esempio sono lì (usa la lente)');
+    map.setView([lat,lng],far?15:14);map.panBy([0,150],{animate:false})}
+  lookup(lat,lng);renderMapUi();
+}
+async function lookup(lat,lng){
+  if(lastLook&&dist(lastLook,{lat,lng})<60)return;lastLook={lat,lng};
+  $('#placeSub').textContent=lat.toFixed(4)+', '+lng.toFixed(4);
+  try{const r=await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=17&accept-language=it`);
+    const j=await r.json(),a=j.address||{};
+    const name=j.name||a.road||a.pedestrian||a.neighbourhood||a.suburb||'Posizione attuale';
+    const area=[a.suburb||a.neighbourhood,a.city||a.town||a.village].filter(Boolean).join(', ');
+    $('#placeName').textContent=name;$('#placeSub').textContent=area||'';placeLabel=name+(area?' · '+area:'');
+  }catch(e){$('#placeName').textContent='Posizione attuale'}
+}
+if('geolocation' in navigator){
+  navigator.geolocation.watchPosition(p=>{geoDenied=false;gpsPos={lat:p.coords.latitude,lng:p.coords.longitude,acc:p.coords.accuracy};if(!simMode)setMe(gpsPos.lat,gpsPos.lng,gpsPos.acc)},
+    ()=>{geoDenied=true;$('#placeName').textContent='Posizione non disponibile';$('#placeSub').textContent='Usa ⊕ e tocca la mappa per scegliere dove sei'},
+    {enableHighAccuracy:true,maximumAge:10000,timeout:15000});
+}
+map.on('click',e=>{if(simMode)setMe(e.latlng.lat,e.latlng.lng,15,true)});
+
+let mapF='all';
+const mapPass=p=>mapF==='all'||(mapF==='urgent'?(!p.resolved&&urgOf(p)!=='calm'):(p.by!=='me'&&isFriend(p.by)));
+function renderMap(){
+  layer.clearLayers();
+  document.querySelectorAll('#mapF .chip').forEach(c=>c.classList.toggle('on',c.dataset.id===mapF));
+  const live=alive().filter(mapPass);
+  db.places.forEach(pl=>{
+    const n=live.filter(p=>p.placeId===pl.id).length,s=status(pl);
+    const ic=L.divIcon({className:'',html:`<div class="pl"><i style="background:${s?REP[s.type].c:'#9aa4af'}"></i>${esc(pl.name.split(' – ')[0])}${n?`<b>${n}</b>`:''}</div>`,iconSize:[0,0]});
+    L.marker([pl.lat,pl.lng],{icon:ic}).on('click',()=>openPlace(pl.id)).addTo(layer);
+  });
+  live.filter(p=>!p.placeId).forEach(p=>{
+    const u=urgOf(p),col={alert:'#E5484D',warn:'#E08A00',calm:'#1F9D63'}[u];
+    if(!p.resolved)L.circle([p.lat,p.lng],{radius:p.radius,color:col,weight:1,fillOpacity:.05,interactive:false}).addTo(layer);
+    const fresh=!p.resolved&&now()-p.t<30*M;
+    const ic=L.divIcon({className:'',html:`<div class="q-pin u-${u} ${fresh?'fresh':''} ${p.resolved?'res':''}">${p.resolved?'✓':p.type==='n'?'!':'?'}</div>`,iconSize:[36,36],iconAnchor:[18,18]});
+    L.marker([p.lat,p.lng],{icon:ic}).on('click',()=>openThread(p.id)).addTo(layer);
+  });
+  if(mapF==='all')ZONES.forEach(z=>L.circle([z.lat,z.lng],{radius:z.radius_m,color:'#2f6fe4',weight:1.5,dashArray:'6 6',fill:false,interactive:false}).addTo(layer));
+  (mapF==='urgent'?[]:friendLocs()).forEach(f=>{
+    const live=isLive(f);
+    if(f.area)L.circle([f.lat,f.lng],{radius:1000,color:'#1F9D63',weight:1,fillOpacity:.04,interactive:false}).addTo(layer);
+    const ic=L.divIcon({className:'',html:`<div class="fpin ${live?'on':''}">${av(f.id)}<b>${esc(user(f.id).n.split(' ')[0])}, ${live?'ora':ago(f.t)}</b></div>`,iconSize:[0,0]});
+    L.marker([f.lat,f.lng],{icon:ic,zIndexOffset:800}).on('click',()=>openProfile(f.id)).addTo(layer);
+  });
+}
+const withD=arr=>arr.map(x=>({...x,d:me?dist(me,x):null}));
+function typeTags(p){const u=urgOf(p);
+  return `<span class="tag ${p.type==='n'?'news':''}">${p.type==='n'?'Notizia':'Domanda'}</span>`+
+    (p.resolved?'<span class="tag done">✓ Risolto</span>':`<span class="tag u u-${u}"><i></i>${esc(CATS[p.cat]||URG_L[u])}</span>`)+
+    (p.demo?'<span class="tag cat">Esempio</span>':'')}
+function postCard(p,full){
+  const u=user(p.by),n=p.answers.length;
+  return`<button class="card ${p.resolved?'res':''}" data-act="thread" data-id="${esc(p.id)}">
+    <div class="who"><span class="who" data-act="profile" data-id="${esc(p.by)}">${av(p.by)}<b>${esc(u.n)}</b></span></div><div class="meta" style="margin:2px 0 0 44px">${esc(p.place)}, ${ago(p.t)}</div>
+    <p class="ptxt">${esc(p.text)}</p>${p.photo?`<img class="pimg" src="${esc(p.photo)}" alt="Foto allegata" loading="lazy">`:''}
+    <div class="facts">${typeTags(p)}<span>${n} rispost${n===1?'a':'e'}</span>${p.confirms?`<span>${p.confirms===1?'1 conferma':p.confirms+' confermano'}</span>`:''}${p.votes?`<span>${p.votes===1?'1 utile':p.votes+' utili'}</span>`:''}${p.d!=null?`<span>a ${fmtD(p.d)}</span>`:''}${full&&!p.resolved?`<span>scade tra ${left(p.exp)}</span>`:''}</div></button>`;
+}
+function renderMapUi(){
+  renderMap();
+  const pls=withD(db.places).sort((a,b)=>(a.d??0)-(b.d??0));
+  $('#placesRow').innerHTML=pls.map(pl=>`<button class="pc" data-act="place" data-id="${pl.id}"><b>${esc(pl.name)}</b>${stHtml(pl)}<span class="meta">${pl.d!=null?fmtD(pl.d):esc(pl.cat)}</span></button>`).join('');
+  $('#plCount').textContent=pls.filter(pl=>status(pl)).length+' con segnalazioni';
+  const fl=withD(friendLocs()).sort((a,b)=>(a.d??0)-(b.d??0));
+  $('#friendsBox').classList.toggle('hide',!fl.length);
+  $('#fCount').textContent=fl.filter(isLive).length?fl.filter(isLive).length+' live':'';
+  $('#friendsRow').innerHTML=fl.map(f=>`<button class="fchip" data-act="showFriend" data-id="${f.id}">${av(f.id)}<span><b>${esc(user(f.id).n)}</b><small>${f.d!=null?fmtD(f.d)+', ':''}${isLive(f)?'live':ago(f.t)}</small></span></button>`).join('');
+  const list=withD(alive().filter(mapPass)).sort((a,b)=>(a.d??0)-(b.d??0));
+  $('#count').textContent=list.length+' attive';
+  $('#list').innerHTML=list.length?list.map(p=>postCard(p)).join('')+'<p class="demo">“Esempio” indica le conversazioni demo; le altre sono vostre.</p>':'<p class="empty">Qui intorno è tutto tranquillo. Fai tu la prima domanda.</p>';
+}
+
+/* ---------- viste ---------- */
+let tab='map',feedF='near',feedCat='';
+function setTab(t){tab=t;
+  document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===t));
+  $('#mapUi').classList.toggle('hide',t!=='map');
+  ['feed','groups','act','me'].forEach(v=>$('#v-'+v).classList.toggle('hide',v!==t));
+  render();
+}
+function render(){
+  const ta=$('#topAv');if(ta)ta.innerHTML=av('me');
+  const unread=allN().filter(n=>!n.read).length;$('#badge').textContent=unread;$('#badge').classList.toggle('hide',!unread);
+  if(tab==='map')renderMapUi();
+  if(tab==='feed')renderFeed();
+  if(tab==='groups')renderGroups();
+  if(tab==='act')renderAct();
+  if(tab==='me'){renderMe();bindPeopleSearch()}
+}
+function renderFeed(){
+  let list=withD(alive());
+  if(feedF==='near')list.sort((a,b)=>(a.d??0)-(b.d??0));
+  if(feedF==='urgent')list=list.filter(p=>!p.resolved&&urgOf(p)!=='calm').sort((a,b)=>(urgOf(a)==='alert'?0:1)-(urgOf(b)==='alert'?0:1)||b.t-a.t);
+  if(feedF==='hot')list.sort((a,b)=>(b.votes+b.answers.length*2)-(a.votes+a.answers.length*2));
+  if(feedF==='new')list.sort((a,b)=>b.t-a.t);
+  if(feedF==='friends')list=list.filter(p=>isFriend(p.by));
+  if(feedF==='follow')list=list.filter(p=>p.follow||p.by==='me');
+  if(feedF==='zones')list=list.filter(inZones).sort((a,b)=>b.t-a.t);
+  if(feedCat)list=list.filter(p=>p.cat===feedCat);
+  const F=[['near','Vicino a me'],['zones','Le mie zone'],['urgent','Urgenti'],['new','Più recenti'],['hot','Popolari'],['friends','Amici'],['follow','Seguiti']];
+  $('#v-feed').innerHTML=`<h1>Feed</h1><p class="sub">${ZONES.length?'Cosa succede vicino a te e in '+esc(ZONES.map(z=>z.name).join(', ')):'Cosa succede adesso vicino a te. Segui le tue zone da Profilo.'}</p>
+    <div class="chips">${F.map(([k,l])=>`<button class="chip ${feedF===k?'on':''}" data-act="feedF" data-id="${k}">${l}</button>`).join('')}</div>
+    <div class="chips"><button class="chip ${!feedCat?'on':''}" data-act="feedCat" data-id="">Tutte</button>${Object.entries(CATS).map(([k,l])=>`<button class="chip ${feedCat===k?'on':''}" data-act="feedCat" data-id="${k}">${l}</button>`).join('')}</div>
+    ${list.length?list.map(p=>postCard(p,true)).join(''):feedF==='zones'&&!ZONES.length?'<p class="empty">Non segui ancora nessuna zona. <a href="#" data-act="zoneNew">Segui la zona dove sei</a></p>':'<p class="empty">Niente qui per ora. Prova un altro filtro.</p>'}
+    <p class="demo">“Esempio” indica le conversazioni demo; le altre sono vostre.</p>`;
+}
+const GCOL=['#2f6fe4','#30a46c','#e5484d','#f76b15','#8e4ec6','#12a594'];
+const gMembers=id=>GMEM.filter(m=>m.group_id===id);
+const amIn=id=>GMEM.some(m=>m.group_id===id&&m.user_id===myId);
+const amOwner=id=>GMEM.some(m=>m.group_id===id&&m.user_id===myId&&m.role==='owner');
+const gTopics=id=>GPOSTS.filter(x=>x.group_id===id&&!x.parent_id);
+const gReplies=id=>GPOSTS.filter(x=>x.parent_id===id).sort((a,b)=>a.t-b.t);
+const gLast=id=>Math.max(0,...GPOSTS.filter(x=>x.group_id===id).map(x=>x.t));
+const gby=x=>x.author_id===myId?'me':x.author_id;
+const gAv=(g,cls)=>`<span class="av gav ${cls||''}" style="background:${esc(g.color)}">${esc(ini(g.name))}</span>`;
+function renderGroups(){
+  const mine=GROUPS.filter(g=>amIn(g.id)).sort((a,b)=>gLast(b.id)-gLast(a.id)),other=GROUPS.filter(g=>!amIn(g.id)).sort((a,b)=>gMembers(b.id).length-gMembers(a.id).length||gLast(b.id)-gLast(a.id));
+  const gc=g=>{const n=gMembers(g.id).length,t=gTopics(g.id).length,last=gLast(g.id);
+    return`<button class="card" data-act="group" data-id="${g.id}"><div class="who">${gAv(g)}<div><b>${esc(g.name)}</b><div class="meta">${n} membr${n===1?'o':'i'}, ${t} discussion${t===1?'e':'i'}${g.place_label?' · '+esc(g.place_label):''}</div></div></div>${g.description?`<p class="meta" style="margin:8px 0 0">${esc(g.description)}</p>`:''}${last?`<div class="meta" style="margin-top:6px">Ultimo messaggio ${ago(last)}</div>`:''}</button>`};
+  $('#v-groups').innerHTML=`<h1>Gruppi</h1><p class="sub">Forum aperti per zona o passione: tutti leggono, chi si unisce scrive e riceve gli avvisi.</p>
+    <button class="pri" style="width:100%;margin-bottom:14px" data-act="gNew">Crea un gruppo</button>
+    <div class="sec-t">I tuoi gruppi</div>${mine.length?mine.map(gc).join(''):'<p class="empty">Non sei ancora in nessun gruppo. Unisciti a uno qui sotto o creane uno.</p>'}
+    ${other.length?`<div class="sec-t">Altri gruppi</div>${other.map(gc).join('')}`:''}`;
+}
+function topicHtml(x,full){
+  const r=gReplies(x.id),mine=x.author_id===myId,g=GROUPS.find(y=>y.id===x.group_id);
+  return`<div class="ans ${full?'':'gpost'}" ${full?'':`data-act="gTopic" data-id="${x.id}"`}><div class="who"><span class="who" data-act="profile" data-id="${esc(gby(x))}">${av(gby(x))}<b>${esc(user(gby(x)).n)}</b></span><span class="meta">${ago(x.t)}</span></div>
+    <p>${esc(x.body)}</p>${x.photo_url?`<img class="aimg" src="${esc(x.photo_url)}" alt="Foto" loading="lazy">`:''}
+    ${full?(mine||(g&&amOwner(g.id))?`<div class="acts"><button class="red" data-act="gDel" data-id="${x.id}">Elimina</button></div>`:''):`<div class="meta">${r.length?r.length+' rispost'+(r.length===1?'a':'e')+', ultima '+ago(r[r.length-1].t):'Nessuna risposta, tocca per rispondere'}</div>`}</div>`;
+}
+function openGroup(id){
+  const g=GROUPS.find(x=>x.id===id);if(!g){toast('Questo gruppo non esiste più');closeModal();return}
+  const mem=gMembers(id),inG=amIn(id),own=amOwner(id),topics=gTopics(id).sort((a,b)=>Math.max(b.t,...gReplies(b.id).map(r=>r.t))-Math.max(a.t,...gReplies(a.id).map(r=>r.t)));
+  const draft=$('#gText')&&openId===id&&modalKind==='group'?$('#gText').value:'';
+  openModal(`<div class="who">${gAv(g,'lg')}<div><h3 style="margin:0">${esc(g.name)}</h3><div class="meta">${g.place_label?esc(g.place_label)+' · ':''}${mem.length} membr${mem.length===1?'o':'i'}</div></div></div>
+    ${g.description?`<p>${esc(g.description)}</p>`:''}
+    ${mem.length?`<div class="gmembers">${mem.slice(0,8).map(m=>av(m.user_id===myId?'me':m.user_id)).join('')}<span class="meta">${mem.slice(0,3).map(m=>esc(user(m.user_id===myId?'me':m.user_id).n.split(' ')[0])).join(', ')}${mem.length>3?' e altri '+(mem.length-3):''}</span></div>`:''}
+    <div class="acts" style="margin-top:10px">${inG?(own?'<span class="near">Amministratore</span>':`<button data-act="gLeave" data-id="${id}">Esci dal gruppo</button>`):`<button class="ok" data-act="gJoin" data-id="${id}">Unisciti al gruppo</button>`}<button data-act="gShare" data-id="${id}">Condividi</button>${own?`<button class="red" data-act="gRemove" data-id="${id}">Elimina gruppo</button>`:''}</div>
+    ${inG?`<div class="composer2"><textarea id="gText" maxlength="500" placeholder="Apri una discussione nel gruppo">${esc(draft)}</textarea><div class="photo-pick" id="gPick"></div>
+      <div class="btns" style="margin-top:10px"><button class="pri" data-act="gPost" data-id="${id}">Pubblica</button></div></div>`:'<p class="meta" style="margin-top:12px">Unisciti per scrivere e ricevere un avviso a ogni nuova discussione.</p>'}
+    <label>${topics.length} discussion${topics.length===1?'e':'i'}</label>
+    ${topics.length?topics.map(x=>topicHtml(x)).join(''):'<p class="empty">Ancora nessuna discussione. Apri la prima.</p>'}
+    <div class="btns"><button class="sec" data-close>Chiudi</button></div>`,'group');
+  if(openId!==id||modalKind!=='group')gPhoto=null;
+  openId=id;modalKind='group';if(inG)bindPhoto($('#gPick'),b=>gPhoto=b,gPhoto);
+}
+function openGPost(id){
+  const x=GPOSTS.find(y=>y.id===id);if(!x){toast('Discussione eliminata');closeModal();return}
+  const g=GROUPS.find(y=>y.id===x.group_id),inG=amIn(x.group_id),own=amOwner(x.group_id),r=gReplies(id);
+  const draft=$('#gText')&&openId===id&&modalKind==='gpost'?$('#gText').value:'';
+  openModal(`<a href="#" class="meta" data-act="group" data-id="${x.group_id}">‹ ${esc(g?g.name:'Gruppo')}</a>
+    ${topicHtml(x,true)}
+    <label>${r.length} rispost${r.length===1?'a':'e'}</label>
+    ${r.map(y=>`<div class="ans" style="margin-left:14px"><div class="who"><span class="who" data-act="profile" data-id="${esc(gby(y))}">${av(gby(y))}<b>${esc(user(gby(y)).n)}</b></span><span class="meta">${ago(y.t)}</span></div><p>${esc(y.body)}</p>${y.photo_url?`<img class="aimg" src="${esc(y.photo_url)}" alt="Foto" loading="lazy">`:''}
+      ${y.author_id===myId||own?`<div class="acts"><button class="red" data-act="gDel" data-id="${y.id}">Elimina</button></div>`:''}</div>`).join('')}
+    ${inG?`<div class="composer"><textarea id="gText" maxlength="500" placeholder="Rispondi">${esc(draft)}</textarea><div class="photo-pick" id="gPick"></div>
+      <div class="btns"><button class="sec" data-act="group" data-id="${x.group_id}">Indietro</button><button class="pri" data-act="gReply" data-id="${id}">Rispondi</button></div></div>`
+      :`<div class="btns"><button class="sec" data-act="group" data-id="${x.group_id}">Indietro</button><button class="pri" data-act="gJoin" data-id="${x.group_id}">Unisciti per rispondere</button></div>`}`,'gpost');
+  if(openId!==id||modalKind!=='gpost')gPhoto=null;
+  openId=id;modalKind='gpost';if(inG)bindPhoto($('#gPick'),b=>gPhoto=b,gPhoto);
+}
+function openNewGroup(){
+  let col=GCOL[0];
+  openModal(`<h3>Nuovo gruppo</h3><p class="meta">Un forum aperto: tutti lo leggono, chi si unisce scrive. Tu sarai l'amministratore e potrai togliere i messaggi.</p>
+    <form id="gForm"><label for="gName">Nome</label><input id="gName" maxlength="50" required placeholder="Es. Runner di Richmond Park">
+    <label for="gDesc">Di cosa parla</label><textarea id="gDesc" maxlength="200" placeholder="Es. Giri del parco, gruppi del sabato, sicurezza al buio"></textarea>
+    <label for="gPlace">Zona (facoltativa)</label><input id="gPlace" maxlength="80" value="${esc((placeLabel||'').split(' · ').pop()==='Posizione attuale'?'':(placeLabel||'').split(' · ').pop())}" placeholder="Es. Richmond">
+    <label>Colore</label><div class="swatches">${GCOL.map((c,i)=>`<button type="button" class="${i?'':'on'}" style="background:${c}" data-c="${c}" aria-label="Colore ${i+1}"></button>`).join('')}</div>
+    <div class="btns"><button type="button" class="sec" data-close>Annulla</button><button class="pri">Crea il gruppo</button></div></form>`,'gnew');
+  document.querySelectorAll('.swatches button').forEach(b=>b.onclick=()=>{col=b.dataset.c;document.querySelectorAll('.swatches button').forEach(x=>x.classList.toggle('on',x===b))});
+  $('#gForm').onsubmit=async e=>{e.preventDefault();const n=$('#gName').value.trim();if(n.length<3){toast('Il nome deve avere almeno 3 lettere');return}
+    const btn=$('#gForm .pri');btn.disabled=true;btn.textContent='Creo…';
+    const id=await run(sb.rpc('create_group',{p_name:n,p_description:$('#gDesc').value.trim(),p_color:col,p_place_label:$('#gPlace').value.trim()}),'Gruppo creato ✓');
+    if(id){setTab('groups');openGroup(id)}else{btn.disabled=false;btn.textContent='Crea il gruppo'}};
+  setTimeout(()=>$('#gName').focus(),60);
+}
+function openZoneNew(c){ // c = {name,lat,lng}
+  let rad=c.big?5000:2000;
+  openModal(`<h3>Segui una zona</h3><p class="meta">Ricevi un avviso per ogni domanda o notizia in questa zona, anche quando non ci sei.</p>
+    <form id="zForm"><label for="zName">Nome</label><input id="zName" maxlength="60" required value="${esc(c.name)}" placeholder="Es. Casa, Lavoro, Trescore">
+    <label>Quanto grande</label><div class="seg" id="zRad">${[[1000,'1 km'],[2000,'2 km'],[5000,'5 km'],[10000,'10 km']].map(([v,l])=>`<button type="button" class="${v===rad?'on':''}" data-v="${v}">${l}</button>`).join('')}</div>
+    <div class="meta" style="margin-top:8px">Centro: ${esc(c.where||c.name)}</div>
+    <div class="btns"><button type="button" class="sec" data-close>Annulla</button><button class="pri">Segui</button></div></form>`,'znew');
+  document.querySelectorAll('#zRad button').forEach(b=>b.onclick=()=>{rad=+b.dataset.v;document.querySelectorAll('#zRad button').forEach(x=>x.classList.toggle('on',x===b))});
+  $('#zForm').onsubmit=async e=>{e.preventDefault();const n=$('#zName').value.trim();if(!n)return;
+    if(await run(sb.from('followed_zones').insert({name:n,lat:+c.lat.toFixed(5),lng:+c.lng.toFixed(5),radius_m:rad}),'Segui '+n+' ✓'))closeModal()};
+}
+const allN=()=>[...NOTIFS,...db.notifs];
+function renderAct(){
+  clearBadge();
+  $('#v-act').innerHTML=`<h1>Attività</h1><p class="sub">Domande vicino a te e nelle tue zone, risposte, gruppi e amici</p>
+    ${pushState!=='on'?`<button class="card" data-act="tab" data-id="me"><b>Attiva le notifiche sul telefono</b><div class="meta">${esc(pushTxt())}</div></button>`:''}
+    <div class="box2">${allN().sort((a,b)=>b.t-a.t).map(n=>`<div class="row" data-n="${n.id}" ${n.post?`data-act="thread" data-id="${n.post}"`:n.group?`data-act="group" data-id="${n.group}"`:n.tab?`data-act="tab" data-id="${n.tab}"`:''} style="cursor:pointer">
+      <span class="st"><i style="background:${n.read?'#c3cad2':'var(--acc)'}"></i></span><div><div style="font-weight:${n.read?400:600}">${esc(n.text)}</div><div class="meta">${ago(n.t)}</div></div></div>`).join('')}</div>
+    <div class="btns"><button class="sec" data-act="readAll">Segna tutte come lette</button></div>`;
+}
+function bindPeopleSearch(){const q=$('#peopleQ');if(!q)return;q.oninput=()=>{const v=q.value.trim().toLowerCase().replace(/^@/,'');
+  document.querySelectorAll('#peopleBox .row').forEach(r=>r.classList.toggle('hide',!!v&&!r.dataset.q.includes(v)))}}
+function renderMe(){
+  const mineQ=db.posts.filter(p=>p.by==='me').length,mineA=db.posts.reduce((s,p)=>s+p.answers.filter(a=>a.by==='me').length,0);
+  const pts=myPoints(),lvl=pts>=100?'Esperto di zona':pts>=30?'Informatore':'Nuovo arrivato';
+  const fr=Object.entries(db.friends);
+  const sugg=Object.keys(U).filter(k=>!db.friends[k]).slice(0,3);
+  const known=new Set(FR.map(f=>f.other)),people=Object.keys(PROF).filter(id=>id!==myId&&!known.has(id));
+  const nFriends=fr.filter(f=>f[1]==='friend').length+FR.filter(f=>f.status==='accepted').length;
+  const ex=' <span class="tag cat">Esempio</span>';
+  const frRow=f=>`<div class="row"><div class="pick" data-act="profile" data-id="${f.other}">${av(f.other)}<div><b>${esc(user(f.other).n)}</b><div class="meta">${f.status==='accepted'?(LOC[f.other]?(isLive(LOC[f.other])?'Posizione live':'Ultima posizione '+ago(LOC[f.other].t)):(PROF[f.other]||{}).u?'@'+esc(PROF[f.other].u):'Amico'):f.incoming?'Vuole essere tuo amico':'Richiesta inviata'}</div></div></div>
+      ${f.status==='accepted'?`<button class="small sec" data-act="rfDel" data-id="${f.id}">Rimuovi</button>`:f.incoming?`<button class="small pri" data-act="rfAccept" data-id="${f.id}">Accetta</button><button class="small sec" data-act="rfDel" data-id="${f.id}">No</button>`:`<button class="small sec" data-act="rfDel" data-id="${f.id}">Annulla</button>`}</div>`;
+  const sw=(k,on)=>`<button class="sw ${on?'on':''}" data-act="toggle" data-id="${k}" role="switch" aria-checked="${on}" aria-label="${k}"></button>`;
+  const seg=(k,opts)=>`<div class="seg">${opts.map(([v,l])=>`<button class="${String(db.me[k])===v?'on':''}" data-act="set" data-id="${k}" data-v="${v}">${l}</button>`).join('')}</div>`;
+  $('#v-me').innerHTML=`<div class="hero-me"><div class="avwrap">${av('me','lg')}<label for="avFile" aria-label="Cambia la foto profilo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg></label></div>
+      <div><button class="namebtn" data-act="editName" aria-label="Cambia il nome"><h1>${esc(db.me.name||'Io')}</h1></button><div class="handle">${(PROF[myId]||{}).u?'@'+esc(PROF[myId].u):''}</div><div class="meta">${lvl}, ${pts} punti</div></div></div>
+    <div class="stats"><div><b>${mineQ}</b><span class="meta">Domande</span></div><div><b>${mineA}</b><span class="meta">Risposte</span></div><div><b>${nFriends}</b><span class="meta">Amici</span></div></div>
+    <p class="meta">Guadagni punti quando rispondi da vicino e la tua risposta è votata utile. I punti danno più peso alle tue risposte.</p>
+
+    <div class="sec-t">Amici</div>
+    <div class="box2">${FR.slice().sort((a,b)=>(b.incoming&&b.status==='pending')-(a.incoming&&a.status==='pending')).map(frRow).join('')}${fr.map(([k,s])=>`<div class="row">${av(k)}<div><b>${esc(U[k].n)}</b>${ex}<div class="meta">${s==='friend'?(U[k].b||U[k].rep+' punti'):'Vuole essere tua amica'}</div></div>
+      ${s==='request'?`<button class="small pri" data-act="fAccept" data-id="${k}">Accetta</button><button class="small sec" data-act="fDecline" data-id="${k}">No</button>`:s==='sent'?'<span class="meta">Richiesta inviata</span>':`<button class="small sec" data-act="fRemove" data-id="${k}">Rimuovi</button>`}</div>`).join('')}</div>
+    <div class="sec-t">Persone nell'app</div>
+    ${people.length>3?'<input id="peopleQ" class="qbox" type="search" placeholder="Cerca per nome o @nome utente" autocomplete="off">':''}
+    <div class="box2" id="peopleBox">${people.length?people.map(id=>`<div class="row" data-q="${esc((user(id).n+' '+(PROF[id].u||'')).toLowerCase())}"><div class="pick" data-act="profile" data-id="${id}">${av(id)}<div><b>${esc(user(id).n)}</b><div class="meta">${PROF[id].u?'@'+esc(PROF[id].u):'Membro del prototipo'}</div></div></div><button class="small pri" data-act="rfAdd" data-id="${id}">Aggiungi</button></div>`).join(''):'<p class="empty">Siete già tutti amici o in attesa di risposta.</p>'}</div>
+    <div class="sec-t">Suggeriti</div>
+    <div class="box2">${sugg.length?sugg.map(k=>`<div class="row">${av(k)}<div><b>${esc(U[k].n)}</b>${ex}<div class="meta">${U[k].rep} punti${U[k].b?' · '+U[k].b:''}</div></div><button class="small pri" data-act="fAdd" data-id="${k}">Aggiungi</button></div>`).join(''):'<p class="empty">Nessun suggerimento</p>'}</div>
+
+    <div class="sec-t">Posizione per gli amici</div>
+    <div class="box2">
+      <div class="row"><span class="ldot ${wantShare()&&me?'on':''}"></span><div><b>Mostra la mia posizione agli amici</b><div class="meta">${!wantShare()?'Spenta: i tuoi amici non vedono dove sei.':geoDenied?'Accesa, ma il telefono non dà la posizione all\'app: consentila in Impostazioni → Privacy → Localizzazione.':`La vedono solo i tuoi ${FR.filter(f=>f.status==='accepted').length} amic${FR.filter(f=>f.status==='accepted').length===1?'o':'i'}. Si aggiorna mentre l'app è aperta; quando la chiudi resta l'ultima.`}</div></div>
+      <button class="sw ${wantShare()?'on':''}" data-act="shareToggle" role="switch" aria-checked="${wantShare()}" aria-label="Mostra la mia posizione agli amici"></button></div>
+      ${wantShare()?`<div class="row" style="display:block"><b>Cosa vedono</b><div class="seg" style="margin-top:8px"><button class="${(PROF[myId]||{}).sp!=='area'?'on':''}" data-act="sharePrec" data-id="exact">Posizione esatta</button><button class="${(PROF[myId]||{}).sp==='area'?'on':''}" data-act="sharePrec" data-id="area">Solo la zona (~1 km)</button></div></div>`:''}
+    </div>
+    <div class="sec-t">Privacy</div>
+    <div class="box2">
+      <div class="row"><div><b>Modalità anonima <span class="phase">Fase 2</span></b><div class="meta">Nel prototipo gli altri vedono il tuo nome</div></div>${sw('anon',db.me.anon)}</div>
+      <div class="row"><div><b>Le tue domande e risposte</b><div class="meta">I post liberi sono salvati arrotondati a circa 100 m; quando rispondi gli altri vedono solo quanto eri distante.</div></div></div>
+    </div>
+    <div class="sec-t">Notifiche</div>
+    <div class="box2">
+      <div class="row"><div><b>Notifiche sul telefono</b><div class="meta">${esc(pushTxt())}</div></div>${pushState==='on'?'<button class="small sec" data-act="pushOff">Disattiva</button>':pushState==='off'?'<button class="small pri" data-act="pushOn">Attiva</button>':''}</div>
+      <div class="row"><div><b>Avvisi da chi è vicino</b><div class="meta">${wantAlerts()?'Ti avvisiamo quando qualcuno chiede o segnala qualcosa vicino a dove sei. Per farlo il database tiene solo la tua zona (circa 100 m), nessuno la vede.':'Spenti: non ricevi le domande fatte vicino a te.'}</div></div>
+        <button class="sw ${wantAlerts()?'on':''}" data-act="alertToggle" role="switch" aria-checked="${wantAlerts()}" aria-label="Avvisi da chi è vicino"></button></div>
+      ${wantAlerts()?`<div class="row" style="display:block"><b>Avvisami di domande entro</b><div class="seg" style="margin-top:8px">${[[500,'500 m'],[1000,'1 km'],[3000,'3 km'],[5000,'5 km']].map(([v,l])=>`<button class="${(PROF[myId]||{}).ar===v?'on':''}" data-act="alertRad" data-id="${v}">${l}</button>`).join('')}</div><div class="meta" style="margin-top:6px">Conta anche la zona scelta da chi chiede: vale la più piccola delle due.</div></div>`:''}
+      <div class="row"><div><b>Non disturbare 23–7 <span class="phase">Fase 2</span></b><div class="meta">Max 3 notifiche l'ora negli altri orari</div></div>${sw('quiet',db.me.quiet)}</div>
+    </div>
+    <div class="sec-t">Zone che segui</div>
+    <div class="box2">${ZONES.map(z=>`<div class="row zone-row"><div class="pick" data-act="zoneShow" data-id="${z.id}"><div><b>${esc(z.name)}</b><div class="meta">Entro ${fmtD(z.radius_m)}${me?', a '+fmtD(dist(me,z))+' da te':''} · ${alive().filter(p=>dist(p,z)<=z.radius_m).length} attive ora</div></div></div><button class="small sec" data-act="zoneDel" data-id="${z.id}">Togli</button></div>`).join('')||'<div class="row"><div class="meta">Segui casa, lavoro o il tuo paese: ricevi le domande e le notizie di quella zona anche quando non ci sei.</div></div>'}
+      <div class="row">${ZONES.length<10?`<button class="small pri" data-act="zoneNew">Segui la zona dove sono</button><button class="small sec" data-act="search">Cerca un posto</button>`:'<span class="meta">Puoi seguire al massimo 10 zone.</span>'}</div></div>
+    <div class="sec-t">Account</div>
+    <div class="box2">
+      <div class="row"><div><b>${esc(myEmail)}</b><div class="meta">Accesso attivo · domande e risposte nel database condiviso</div></div><button class="small sec" data-act="logout">Esci</button></div>
+      <div class="row"><div><b>Accedi con Apple</b><div class="meta">Nell'app iPhone: niente password, email nascosta</div></div><span class="phase">Fase 2</span></div>
+      <div class="row"><div><b>Utenti bloccati</b><div class="meta">${(db.blocked||[]).length} bloccati</div></div></div>
+      <div class="row"><button class="small sec red" data-act="reset">Ripristina amici e impostazioni di esempio</button></div>
+    </div>
+    <p class="demo">Prototipo V10. Domande, risposte, foto, gruppi, zone seguite, amicizie e avvisi sono nel database; restano su questo telefono solo gli amici di esempio e alcune impostazioni.</p>`;
+}
+
+/* ---------- profilo di una persona ---------- */
+async function openProfile(id){
+  if(!id)return;
+  if(id==='me'||id===myId){closeModal();setTab('me');return}
+  const demo=!!U[id],u=user(id),pr=PROF[id]||{},fr=FR.find(f=>f.other===id),loc=LOC[id],friends=fr&&fr.status==='accepted';
+  const posts=db.posts.filter(x=>x.by===id).sort((a,b)=>b.t-a.t).slice(0,5);
+  let btn;
+  if(demo){const st=db.friends[id];btn=st==='friend'?'<button class="sec" disabled>Amici (esempio)</button>':`<button class="pri" data-act="fAdd" data-id="${id}">Aggiungi agli amici</button>`}
+  else if(!fr)btn=`<button class="pri" data-act="rfAdd" data-id="${id}">Aggiungi agli amici</button>`;
+  else if(friends)btn=`<button class="sec" data-act="rfDel" data-id="${fr.id}">Rimuovi dagli amici</button>`;
+  else if(fr.incoming)btn=`<button class="pri" data-act="rfAccept" data-id="${fr.id}">Accetta l'amicizia</button>`;
+  else btn=`<button class="sec" data-act="rfDel" data-id="${fr.id}">Annulla la richiesta</button>`;
+  const locHtml=demo?'':friends?(loc?`<div class="locbox"><span class="ldot ${isLive(loc)?'on':''}"></span><div><b>${isLive(loc)?'Posizione live':'Ultima posizione'}</b><div class="meta"><span id="locLabel">…</span>${loc.area?' (zona)':''}, ${isLive(loc)?'aggiornata ora':ago(loc.t)}</div></div><button class="small pri" data-act="showFriend" data-id="${id}">Mappa</button></div>`
+      :'<div class="locbox"><span class="ldot"></span><div><b>Posizione non condivisa</b><div class="meta">La vedrai qui se decide di condividerla con gli amici.</div></div></div>')
+    :'<div class="locbox"><span class="ldot"></span><div><b>Posizione privata</b><div class="meta">Diventate amici: la vedrai solo se decide di condividerla.</div></div></div>';
+  openModal(`<div class="hero-me">${av(id,'lg')}<div><h3 style="margin:0">${esc(u.n)}</h3><div class="handle">${demo?'Utente di esempio':pr.u?'@'+esc(pr.u):''}</div><div class="meta" id="pSince"></div></div></div>
+    <div class="pstats" id="pStats"><div><b>…</b><span class="meta">Domande</span></div><div><b>…</b><span class="meta">Risposte</span></div><div><b>…</b><span class="meta">Utili</span></div></div>
+    <div class="btns" style="margin-top:8px">${btn}</div>
+    ${locHtml}
+    <label>${posts.length?'Attive adesso':'Nessuna domanda attiva adesso'}</label>
+    ${posts.map(p=>postCard(p)).join('')}
+    <div class="btns"><button class="sec" data-close>Chiudi</button></div>`,'profile');
+  openId=id;
+  if(demo){$('#pStats').innerHTML=`<div><b>${posts.length}</b><span class="meta">Domande</span></div><div><b>${db.posts.reduce((s,p)=>s+p.answers.filter(a=>a.by===id).length,0)}</b><span class="meta">Risposte</span></div><div><b>${u.rep||0}</b><span class="meta">Punti</span></div>`;return}
+  const{data}=await sb.rpc('profile_stats',{p_user:id});const st=data&&data[0];
+  if(st&&openId===id&&modalKind==='profile'){
+    $('#pStats').innerHTML=`<div><b>${st.posts}</b><span class="meta">Domande</span></div><div><b>${st.answers}</b><span class="meta">Risposte</span></div><div><b>${st.helpful}</b><span class="meta">Utili ricevuti</span></div>`;
+    if(st.since)$('#pSince').textContent='Nell\'app da '+new Date(st.since).toLocaleDateString('it-IT',{day:'numeric',month:'long'})+(st.best?(st.best===1?', 1 risposta migliore':', '+st.best+' risposte migliori'):'');
+  }
+  if(loc&&friends){const n=await placeName(loc.lat,loc.lng);const el=$('#locLabel');if(el)el.textContent=n}
+}
+
+/* ---------- modale ---------- */
+let openId=null,modalKind=null;
+function openModal(html,kind){$('#mbox').innerHTML=html;$('#modal').classList.remove('hide');modalKind=kind||null;$('#mbox').scrollTop=0}
+function closeModal(){$('#modal').classList.add('hide');openId=null;modalKind=null}
+
+function openPlace(id){
+  const pl=db.places.find(x=>x.id===id);if(!pl)return;
+  const s=status(pl),posts=withD(alive().filter(p=>p.placeId===id)).sort((a,b)=>b.t-a.t),d=me?dist(me,pl):null;
+  const qs=['C\'è coda adesso?','È aperto?','C\'è tanta gente?','Si trova parcheggio?'];
+  openModal(`<span class="tag cat">${esc(pl.cat)}</span><h3>${esc(pl.name)}</h3>
+    <div class="meta">${d!=null?'a '+fmtD(d)+' da te · ':''}${s?`${REP[s.type].l.toLowerCase()} secondo ${s.n} segnalazion${s.n===1?'e':'i'} nell'ultima ora`:'nessuna segnalazione nell\'ultima ora'}</div>
+    <div style="margin-top:6px">${stHtml(pl)}</div>
+    <dl class="kv">${pl.info.map(([k,v])=>`<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>
+    <label>Sei qui? Segnala com'è adesso</label>
+    <div class="rep">${Object.entries(REP).map(([k,r])=>`<button data-act="report" data-id="${pl.id}" data-v="${k}"><span class="st"><i style="background:${r.c}"></i></span>${r.l}</button>`).join('')}</div>
+    <label>Domande veloci</label>
+    <div class="chips" style="margin:0 -16px">${qs.map(q=>`<button class="chip" data-act="askPlace" data-id="${pl.id}" data-v="${esc(q)}">${esc(q)}</button>`).join('')}</div>
+    <label>Conversazioni qui (${posts.length})</label>
+    ${posts.length?posts.map(p=>postCard(p)).join(''):'<p class="empty">Ancora nessuna. Fai la prima domanda.</p>'}
+    <div class="btns"><button class="sec" data-close>Chiudi</button><button class="pri" data-act="askPlace" data-id="${pl.id}" data-v="">Chiedi a chi è lì</button></div>
+    <p class="demo">Info e segnalazioni di esempio</p>`,'place');
+  openId=id;
+  map.panTo([pl.lat,pl.lng]);
+}
+
+function openAsk(placeId,text,sp){
+  const pl=placeId?db.places.find(x=>x.id===placeId):null;
+  if(!pl&&!sp&&!me){toast('Serve la posizione: usa ⊕ e tocca la mappa, oppure cerca un posto con la lente');return}
+  const label=pl?pl.name:sp?sp.name:placeLabel,defR=sp&&AREA.includes(sp.type)?'5000':'1000';
+  openModal(`<h3>${pl||sp?'Chiedi a chi è lì':'Cosa succede qui?'}</h3><div class="meta">📍 ${esc(label)}${sp?' · '+esc(short(sp.addr)):''}</div>
+    <form id="askForm">
+    <div class="seg" data-name="type" style="margin-top:12px"><button type="button" class="on" data-v="q">Domanda</button><button type="button" data-v="n">Notizia</button></div>
+    <textarea id="askText" maxlength="280" placeholder="Es. Perché c'è così tanta gente?" style="margin-top:10px" required>${esc(text||'')}</textarea>
+    <div class="photo-pick" id="photoPick"><label for="askPhoto"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>Aggiungi una foto</label><input type="file" id="askPhoto" accept="image/*" class="hide"></div>
+    <label>Categoria</label>
+    <div class="chips" data-name="cat" style="margin:0 -16px">${Object.entries(CATS).map(([k,l],i)=>`<button type="button" class="chip ${k==='info'?'on':''}" data-v="${k}">${k==='emergenza'?'🔴 ':''}${l}</button>`).join('')}</div>
+    <label>Chi può rispondere</label>
+    <div class="seg" data-name="radius">${[['300','300 m'],['1000','1 km'],['5000','5 km']].map(([v,l])=>`<button type="button" class="${v===defR?'on':''}" data-v="${v}">${l}</button>`).join('')}</div>
+    <label>Scade dopo</label>
+    <div class="seg" data-name="exp"><button type="button" data-v="1">1 ora</button><button type="button" class="on" data-v="3">3 ore</button><button type="button" data-v="24">24 ore</button><button type="button" data-v="48">48 ore</button></div>
+    <div class="meta" style="margin-top:10px">Pubblichi come <b>${esc(meU().n)}</b> · cambia in Profilo</div>
+    <div class="btns"><button type="button" class="sec" data-close>Annulla</button><button class="pri">Pubblica</button></div></form>`,'ask');
+  const f=$('#askForm');let photo=null;
+  const drawPick=()=>{$('#photoPick').innerHTML=photo?`<img src="${URL.createObjectURL(photo)}" alt="Anteprima"><span class="meta">Foto pronta</span><button type="button" id="photoDel">Togli</button>`
+      :'<label for="askPhoto"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>Aggiungi una foto</label>';
+    $('#photoPick').appendChild(inp);const d=$('#photoDel');if(d)d.onclick=()=>{photo=null;drawPick()}};
+  const inp=$('#askPhoto');
+  inp.onchange=async()=>{const file=inp.files[0];inp.value='';if(!file)return;try{photo=await fitJpeg(file,1280);drawPick()}catch(e){toast('Questa immagine non si apre, provane un\'altra')}};
+  f.onsubmit=async e=>{e.preventDefault();const t=$('#askText').value.trim();if(!t)return;
+    const v=n=>f.querySelector(`[data-name="${n}"] .on`).dataset.v;
+    const base=pl||sp||me,btn=f.querySelector('.pri');btn.disabled=true;btn.textContent=photo?'Carico la foto…':'Salvo…';
+    let photoUrl=null;
+    if(photo){const path=`${myId}/${Date.now()}.jpg`,up=await sb.storage.from('post-photos').upload(path,photo,{contentType:'image/jpeg',cacheControl:'31536000'});
+      if(up.error){toast('Foto non caricata: '+up.error.message);btn.disabled=false;btn.textContent='Pubblica';return}
+      photoUrl=sb.storage.from('post-photos').getPublicUrl(path).data.publicUrl;btn.textContent='Salvo…'}
+    const id=await run(sb.rpc('create_post',{p_kind:v('type'),p_category:v('cat'),p_place_id:pl?pl.id:null,p_place_label:label,
+      p_lat:base.lat,p_lng:base.lng,p_radius_m:+v('radius'),p_hours:+v('exp'),p_body:t,p_photo_url:photoUrl}),'Pubblicata ✓');
+    if(!id){btn.disabled=false;btn.textContent='Pubblica';return}
+    if(!db.follow.includes(id))db.follow.push(id);save();openThread(id);
+  };
+  setTimeout(()=>$('#askText').focus(),60);
+}
+
+function openThread(id){
+  const p=db.posts.find(x=>x.id===id);if(!p)return;
+  const u=user(p.by),d=me?dist(me,p):null,inside=d!=null&&d<=p.radius;
+  const answers=p.answers.slice().sort((a,b)=>(b.best-a.best)||(b.votes-a.votes)||(a.t-b.t));
+  const draft=$('#ansText')&&openId===id?$('#ansText').value:'';
+  openModal(`<div class="who" data-act="profile" data-id="${esc(p.by)}">${av(p.by)}<div><b>${esc(u.n)}</b><div class="meta">${ago(p.t)}, scade tra ${left(p.exp)}</div></div></div>
+    <div class="facts" style="margin-top:12px">${typeTags(p)}</div>
+    <h3>${esc(p.text)}</h3>${p.photo?`<a href="${esc(p.photo)}" target="_blank" rel="noopener"><img class="timg" src="${esc(p.photo)}" alt="Foto allegata"></a>`:''}
+    <div class="meta">📍 ${p.placeId?`<a href="#" data-act="place" data-id="${p.placeId}">${esc(p.place)}</a>`:esc(p.place)} · zona ${fmtD(p.radius)}</div>
+    ${p.resolved?`<div class="resbar">✓ Risolto${p.resolves?`, lo dicono ${p.resolves} person${p.resolves===1?'a':'e'}`:''}</div>`:''}
+    <div class="acts" style="margin-top:10px"><button class="ok ${p.myConfirm?'on':''}" data-act="react" data-id="${p.id}" data-v="confirm">✓ Confermo${p.confirms?' '+p.confirms:''}</button><button class="ok ${p.myResolve?'on':''}" data-act="react" data-id="${p.id}" data-v="resolved">Risolto${p.resolves?' '+p.resolves:''}</button></div>
+    <div class="acts"><button class="${p.voted?'on':''}" data-act="voteP" data-id="${p.id}">▲ Utile ${p.votes}</button><button class="${p.follow?'on':''}" data-act="follow" data-id="${p.id}">${p.follow?'Segui ✓':'Segui'}</button><button data-act="share" data-id="${p.id}">Condividi</button>${p.by!=='me'?`<button data-act="flag" data-id="${p.by}">Segnala</button>`:`<button class="red" data-act="del" data-id="${p.id}">Elimina</button>`}</div>
+    <label>${answers.length} rispost${answers.length===1?'a':'e'}</label>
+    ${answers.length?answers.map(a=>{const au=user(a.by),near=a.d!=null&&a.d<=p.radius;return`<div class="ans ${a.best?'best':''}">
+      <div class="who"><span class="who" data-act="profile" data-id="${esc(a.by)}">${av(a.by)}<b>${esc(au.n)}</b></span>${near?'<span class="near">Era lì</span>':''}${a.best?'<span class="near">Migliore</span>':''}</div>
+      <p>${esc(a.text)}</p>${a.photo?`<a href="${esc(a.photo)}" target="_blank" rel="noopener"><img class="aimg" src="${esc(a.photo)}" alt="Foto della risposta" loading="lazy"></a>`:''}<div class="meta">${a.d!=null?'da '+fmtD(a.d)+' dal posto':'distanza non nota'} · ${ago(a.t)}${a.demo?' · esempio':''}</div>
+      <div class="acts"><button class="${a.voted?'on':''}" data-act="voteA" data-id="${p.id}" data-v="${a.id}">▲ Utile ${a.votes}</button>
+      ${p.by==='me'&&!a.best&&a.by!=='me'?`<button data-act="best" data-id="${p.id}" data-v="${a.id}">Segna migliore</button>`:''}
+      ${a.by!=='me'?`<button data-act="flag" data-id="${a.by}">Segnala</button>`:`<button class="red" data-act="delA" data-id="${p.id}" data-v="${a.id}">Elimina</button>`}</div></div>`}).join(''):'<p class="empty">Ancora nessuna risposta. Chi è in zona riceve un avviso.</p>'}
+    <div class="composer">
+    ${inside?'':'<div class="warn" style="margin:0 0 8px">Sei fuori dalla zona: la tua risposta non avrà il bollino “Era lì”.</div>'}
+    <textarea id="ansText" maxlength="280" aria-label="Rispondi" placeholder="Rispondi${d!=null?' (sei a '+fmtD(d)+')':''}: cosa vedi da lì?">${esc(draft)}</textarea>
+    <div class="photo-pick" id="ansPick"></div>
+    <div class="btns"><button class="sec" data-close>Chiudi</button><button class="pri" data-act="sendAns" data-id="${p.id}">Invia risposta</button></div></div>`,'thread');
+  if(openId!==id)ansPhoto=null;
+  openId=id;bindPhoto($('#ansPick'),b=>ansPhoto=b,ansPhoto,'Aggiungi una foto da lì');
+}
+
+let geoRes=[],spot=null,spotMarker=null;
+const AREA=['city','town','village','municipality','hamlet','suburb','county','state','region','province','country','city_district','borough','quarter','neighbourhood'];
+const short=a=>String(a||'').split(',').slice(1,4).join(',').trim();
+function openSearch(){
+  openModal(`<h3>Cerca un posto</h3>
+    <form id="qf" style="display:flex;gap:8px;margin-top:8px"><input id="q" type="search" enterkeyhint="search" placeholder="Es. Bergamo, Trescore Balneario, Kew" autocomplete="off"><button class="pri" style="flex:none">Cerca</button></form>
+    <div id="qloc"></div><div id="qgeo"></div><div class="btns"><button class="sec" data-close>Chiudi</button></div>`,'search');
+  const draw=()=>{const q=$('#q').value.trim().toLowerCase();
+    const r=withD(db.places).filter(p=>!q||(p.name+' '+p.cat).toLowerCase().includes(q)).sort((a,b)=>(a.d??0)-(b.d??0));
+    $('#qloc').innerHTML=r.length?'<label>Posti nell’app</label>'+r.map(p=>`<div class="row" data-act="place" data-id="${p.id}" style="cursor:pointer"><div><b>${esc(p.name)}</b><div class="meta">${esc(p.cat)}${p.d!=null?' · '+fmtD(p.d):''}</div></div>${stHtml(p)}</div>`).join(''):'';
+    if(!$('#qgeo').dataset.done)$('#qgeo').innerHTML=q.length>=2?'<p class="meta" style="margin-top:12px">Tocca Cerca per trovarlo in tutto il mondo.</p>':''};
+  $('#q').oninput=()=>{delete $('#qgeo').dataset.done;draw()};
+  $('#qf').onsubmit=async e=>{e.preventDefault();const q=$('#q').value.trim();if(q.length<2)return;$('#q').blur();
+    const box=$('#qgeo');box.dataset.done='1';box.innerHTML='<p class="meta" style="margin-top:12px">Cerco nel mondo…</p>';
+    try{const r=await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(q)}&limit=8&accept-language=it`);
+      const j=await r.json();
+      geoRes=j.map(x=>({name:x.name||String(x.display_name).split(',')[0],addr:x.display_name,lat:+x.lat,lng:+x.lon,type:x.addresstype||x.type,bbox:(x.boundingbox||[]).map(Number)}));
+      box.innerHTML='<label>Nel mondo</label>'+(geoRes.length?geoRes.map((g,i)=>`<div class="row" data-act="geo" data-id="${i}" style="cursor:pointer"><div><b>${esc(g.name)}</b><div class="meta">${esc(short(g.addr))}${me?' · '+fmtD(dist(me,g)):''}</div></div><span class="meta">›</span></div>`).join(''):'<p class="empty">Nessun posto trovato. Prova a scriverlo in un altro modo.</p>')+
+        '<p class="demo">Ricerca © OpenStreetMap</p>';
+    }catch(err){box.innerHTML='<p class="empty">Ricerca non disponibile ora, riprova tra poco.</p>'}};
+  draw();setTimeout(()=>$('#q').focus(),60);
+}
+function showSpot(){
+  const s=spot,b=s.bbox;
+  if(b.length===4&&AREA.includes(s.type))map.fitBounds([[b[0],b[2]],[b[1],b[3]]],{maxZoom:15});else map.setView([s.lat,s.lng],16);
+  if(spotMarker)map.removeLayer(spotMarker);
+  spotMarker=L.marker([s.lat,s.lng],{icon:L.divIcon({className:'',html:'<div class="spot-pin"></div>',iconSize:[34,34],iconAnchor:[17,34]}),zIndexOffset:900}).on('click',openSpot).addTo(map);
+  openSpot();
+}
+function openSpot(){
+  const s=spot;if(!s)return;
+  const d=me?dist(me,s):null,big=AREA.includes(s.type),R=big?5000:1500;
+  const posts=alive().filter(p=>dist(p,s)<=R).sort((a,b)=>b.t-a.t),pls=withD(db.places).filter(p=>dist(p,s)<=R);
+  const qs=big?['Cosa succede oggi qui?','C\'è traffico per arrivare?','C\'è qualche evento?']:['C\'è coda adesso?','È aperto?','C\'è tanta gente?','Si trova parcheggio?'];
+  openModal(`<span class="tag cat">Cercato su OpenStreetMap</span><h3>${esc(s.name)}</h3>
+    <div class="meta">${esc(short(s.addr))}${d!=null?' · a '+fmtD(d)+' da te':''}</div>
+    <p class="meta" style="margin-top:8px">Non serve essere qui: la domanda arriva a chi è in zona.</p>
+    <label>Domande veloci</label>
+    <div class="chips" style="margin:0 -16px">${qs.map(q=>`<button class="chip" data-act="askSpot" data-v="${esc(q)}">${esc(q)}</button>`).join('')}</div>
+    ${pls.length?`<label>Posti nell'app qui intorno</label>${pls.map(p=>`<div class="row" data-act="place" data-id="${p.id}" style="cursor:pointer"><div><b>${esc(p.name)}</b><div class="meta">${esc(p.cat)}</div></div>${stHtml(p)}</div>`).join('')}`:''}
+    <label>Conversazioni entro ${fmtD(R)} (${posts.length})</label>
+    ${posts.length?posts.map(p=>postCard(p)).join(''):'<p class="empty">Ancora nessuna. Fai la prima domanda.</p>'}
+    <button class="sec" style="width:100%;margin-top:12px" data-act="zoneSpot">${ZONES.some(z=>dist(z,s)<300)?'Segui già questa zona ✓':'Segui questa zona'}</button>
+    <div class="btns"><button class="sec" data-close>Chiudi</button><button class="pri" data-act="askSpot" data-v="">Chiedi a chi è lì</button></div>`,'spot');
+}
+
+/* ---------- azioni ---------- */
+const actions={
+  thread:id=>openThread(id),place:id=>openPlace(id),group:id=>openGroup(id),
+  ask:()=>openAsk(null),askPlace:(id,v)=>openAsk(id,v),search:()=>openSearch(),
+  here:()=>{if(!me){toast('Posizione non ancora trovata');return}
+    const n=withD(db.places).sort((a,b)=>a.d-b.d)[0];if(n&&n.d<400)openPlace(n.id);else openAsk(null)},
+  locate:()=>{if(me)map.setView([me.lat,me.lng],16);else toast('Posizione non ancora trovata')},
+  sim:()=>{simMode=!simMode;$('#btnSim').classList.toggle('on',simMode);$('#simBadge').classList.toggle('hide',!simMode);
+    if(!simMode&&gpsPos)setMe(gpsPos.lat,gpsPos.lng,gpsPos.acc);toast(simMode?'Tocca la mappa per spostarti':'Torno al GPS')},
+  sheet:()=>{const sh=$('#sheet');if(sh.classList.contains('min'))sh.classList.remove('min');else if(sh.classList.contains('max')){sh.classList.remove('max');sh.classList.add('min')}else sh.classList.add('max')},
+  tab:id=>{closeModal();setTab(id)},
+  feedF:id=>{feedF=id;render()},feedCat:id=>{feedCat=id;render()},
+  readAll:async()=>{db.notifs.forEach(n=>n.read=true);save();const ids=NOTIFS.filter(n=>!n.read).map(n=>n.dbId);clearBadge();
+    if(ids.length)await run(sb.from('notifications').update({read_at:iso(now())}).in('id',ids));else render()},
+  report:async(id,v)=>{if(await run(sb.from('place_reports').insert({place_id:id,status:v,author_id:myId}),'Grazie! Segnalazione “'+REP[v].l+'” salvata'))openPlace(id)},
+  voteP:async id=>{const p=db.posts.find(x=>x.id===id);
+    if(await run(p.voted?sb.from('votes').delete().eq('post_id',id).eq('user_id',myId):sb.from('votes').insert({post_id:id,user_id:myId})))openThread(id)},
+  voteA:async(id,v)=>{const p=db.posts.find(x=>x.id===id),a=p.answers.find(x=>x.id===v);
+    if(await run(a.voted?sb.from('votes').delete().eq('answer_id',v).eq('user_id',myId):sb.from('votes').insert({answer_id:v,user_id:myId})))openThread(id)},
+  best:async(id,v)=>{if(await run(sb.rpc('set_best_answer',{p_post_id:id,p_answer_id:v}),'Risposta migliore segnata: +15 punti a chi ha risposto'))openThread(id)},
+  follow:id=>{const p=db.posts.find(x=>x.id===id);p.follow=!p.follow;db.follow=p.follow?[...new Set([...db.follow,id])]:db.follow.filter(x=>x!==id);save();toast(p.follow?'Ricevi un avviso per ogni nuova risposta':'Non segui più');openThread(id)},
+  flag:by=>openModal(`<h3>Segnala ${esc(user(by).n)}</h3><p class="meta">Nell'app vera la segnalazione va ai moderatori. Obbligatorio per l'App Store.</p>
+    ${['Informazione falsa','Spam o pubblicità','Offensivo','Rivela dove si trova una persona'].map(r=>`<div class="row" data-act="flagged" data-id="${by}" style="cursor:pointer"><div>${r}</div></div>`).join('')}
+    <div class="row" data-act="block" data-id="${by}" style="cursor:pointer"><div class="red"><b>Blocca questo utente</b></div></div>
+    <div class="btns"><button class="sec" data-close>Annulla</button></div>`),
+  flagged:()=>{closeModal();toast('Segnalazione inviata (demo)')},
+  block:by=>{const n=user(by).n;if(!db.blocked.includes(by))db.blocked.push(by);save();closeModal();toast(n+' bloccato su questo telefono');reloadSoon()},
+  del:async id=>{closeModal();await run(sb.from('posts').delete().eq('id',id),'Eliminata')},
+  delA:async(id,v)=>{if(await run(sb.from('answers').delete().eq('id',v),'Risposta eliminata'))openThread(id)},
+  sendAns:async(id,_,btn)=>{const ta=$('#ansText'),t=ta.value.trim();if(!t){toast('Scrivi la risposta (la foto è in più)');return}if(btn){btn.disabled=true;btn.textContent=ansPhoto?'Carico la foto…':'Invio…'}
+    let url=null;if(ansPhoto){url=await uploadPhoto(ansPhoto);if(!url){if(btn){btn.disabled=false;btn.textContent='Invia risposta'}return}}
+    const ok=await run(sb.rpc('add_answer',{p_post_id:id,p_body:t,p_lat:me?me.lat:null,p_lng:me?me.lng:null,p_photo_url:url}),'Risposta salvata: +10 punti');
+    if(ok){ta.value='';ansPhoto=null;openThread(id)}else if(btn){btn.disabled=false;btn.textContent='Invia risposta'}},
+  logout:async()=>{await sb.auth.signOut();location.replace(APP_URL)},
+  gNew:()=>openNewGroup(),
+  gTopic:id=>openGPost(id),
+  gJoin:async id=>{const g=GROUPS.find(x=>x.id===id);if(await run(sb.from('group_members').insert({group_id:id,user_id:myId}),'Ti sei unito a '+(g?g.name:'il gruppo')))(modalKind==='gpost'&&openId?openGPost(openId):openGroup(id))},
+  gLeave:async id=>{if(await run(sb.from('group_members').delete().eq('group_id',id).eq('user_id',myId),'Sei uscito dal gruppo'))openGroup(id)},
+  gRemove:id=>{const g=GROUPS.find(x=>x.id===id);openModal(`<h3>Eliminare “${esc(g?g.name:'')}”?</h3><p class="meta">Spariscono il gruppo e tutte le discussioni, per tutti. Non si può annullare.</p>
+    <div class="btns"><button class="sec" data-act="group" data-id="${id}">Annulla</button><button class="pri" style="background:var(--alert)" data-act="gRemoveOk" data-id="${id}">Elimina</button></div>`,'gdel')},
+  gRemoveOk:async id=>{closeModal();await run(sb.from('groups').delete().eq('id',id),'Gruppo eliminato')},
+  gShare:async id=>{const g=GROUPS.find(x=>x.id===id);if(!g)return;const url=APP_URL+'#group='+id,text='Gruppo “'+g.name+'” su App Locale';
+    try{if(navigator.share){await navigator.share({title:'App Locale',text,url});return}
+      await navigator.clipboard.writeText(text+'\n'+url);toast('Link copiato: incollalo dove vuoi')}catch(e){if(e&&e.name!=='AbortError')toast('Non riesco a condividere da qui')}},
+  gPost:async(id,_,btn)=>{const t=$('#gText').value.trim();if(!t){toast('Scrivi qualcosa (la foto è in più)');return}btn.disabled=true;btn.textContent=gPhoto?'Carico la foto…':'Pubblico…';
+    let url=null;if(gPhoto){url=await uploadPhoto(gPhoto);if(!url){btn.disabled=false;btn.textContent='Pubblica';return}}
+    if(await run(sb.from('group_posts').insert({group_id:id,author_id:myId,body:t,photo_url:url}),'Pubblicato ✓')){$('#gText').value='';gPhoto=null;openGroup(id)}else{btn.disabled=false;btn.textContent='Pubblica'}},
+  gReply:async(id,_,btn)=>{const x=GPOSTS.find(y=>y.id===id);if(!x)return;const t=$('#gText').value.trim();if(!t){toast('Scrivi la risposta');return}btn.disabled=true;btn.textContent=gPhoto?'Carico la foto…':'Invio…';
+    let url=null;if(gPhoto){url=await uploadPhoto(gPhoto);if(!url){btn.disabled=false;btn.textContent='Rispondi';return}}
+    if(await run(sb.from('group_posts').insert({group_id:x.group_id,parent_id:id,author_id:myId,body:t,photo_url:url}),'Risposta inviata ✓')){$('#gText').value='';gPhoto=null;openGPost(id)}else{btn.disabled=false;btn.textContent='Rispondi'}},
+  gDel:async id=>{const x=GPOSTS.find(y=>y.id===id);if(!x)return;if(await run(sb.from('group_posts').delete().eq('id',id),'Eliminato'))(x.parent_id?openGPost(x.parent_id):openGroup(x.group_id))},
+  alertToggle:async()=>{const on=!wantAlerts();
+    if(await run(sb.from('profiles').update({alerts_nearby:on}).eq('id',myId),on?'Avvisi da chi è vicino attivi':'Avvisi da chi è vicino spenti')){
+      if(on){lastAlert=null;maybeAlert(true)}else sb.rpc('clear_alert_position').then(()=>{})}},
+  alertRad:async v=>{await run(sb.from('profiles').update({alert_radius_m:+v}).eq('id',myId),'Ti avvisiamo entro '+fmtD(+v))},
+  zoneNew:()=>{if(!me){toast('Non so ancora dove sei: consenti la posizione o cerca un posto');return}
+    const n=(placeLabel||'').split(' · ').pop();openZoneNew({name:n&&n!=='Posizione attuale'?n:'Casa',lat:me.lat,lng:me.lng,where:placeLabel})},
+  zoneSpot:()=>{if(!spot)return;if(ZONES.some(z=>dist(z,spot)<300)){toast('Segui già questa zona');return}
+    openZoneNew({name:spot.name,lat:spot.lat,lng:spot.lng,where:short(spot.addr)||spot.name,big:AREA.includes(spot.type)})},
+  zoneDel:async id=>{const z=ZONES.find(x=>x.id===id);await run(sb.from('followed_zones').delete().eq('id',id),'Non segui più '+(z?z.name:'la zona'))},
+  zoneShow:id=>{const z=ZONES.find(x=>x.id===id);if(!z)return;setTab('map');map.fitBounds(L.latLng(z.lat,z.lng).toBounds(z.radius_m*2))},
+  rfAdd:async id=>{await run(sb.from('friendships').insert({requester_id:myId,addressee_id:id}),'Richiesta inviata a '+user(id).n)},
+  rfAccept:async id=>{const f=FR.find(x=>String(x.id)===String(id));
+    await run(sb.from('friendships').update({status:'accepted',responded_at:iso(now())}).eq('id',id),f?'Ora tu e '+user(f.other).n+' siete amici':'Amicizia accettata')},
+  rfDel:async id=>{await run(sb.from('friendships').delete().eq('id',id))},
+  pushOn:async()=>{
+    if(isIOS&&!standalone){toast('Prima aggiungi l’app alla schermata Home');return}
+    if(!PUSH_OK||!swReg){toast('Notifiche non supportate qui');return}
+    const perm=await Notification.requestPermission();
+    if(perm!=='granted'){await refreshPush();render();toast('Permesso non concesso');return}
+    const{data:key,error}=await sb.rpc('push_public_key');if(error||!key){toast('Chiave push non disponibile');return}
+    try{const sub=await swReg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64u(key)});
+      const r=await saveSub(sub);if(r.error){toast('Non salvato: '+r.error.message);return}
+      pushState='on';render();toast('Notifiche attive su questo telefono ✓')}catch(e){toast('Errore: '+e.message)}},
+  pushOff:async()=>{const sub=swReg&&await swReg.pushManager.getSubscription();
+    if(sub){await sb.from('push_subscriptions').delete().eq('endpoint',sub.endpoint);await sub.unsubscribe()}
+    pushState='off';render();toast('Notifiche disattivate su questo telefono')},
+  geo:i=>{const r=geoRes[+i];if(!r)return;spot=r;closeModal();showSpot()},
+  spot:()=>openSpot(),
+  askSpot:(_,v)=>openAsk(null,v,spot),
+  fAccept:k=>{db.friends[k]='friend';save();toast('Ora tu e '+U[k].n+' siete amici');render()},
+  fDecline:k=>{delete db.friends[k];save();render()},
+  fRemove:k=>{delete db.friends[k];save();render()},
+  fAdd:k=>{db.friends[k]='sent';save();toast('Richiesta inviata a '+U[k].n);render();
+    setTimeout(()=>{if(db.friends[k]==='sent'){db.friends[k]='friend';db.notifs.push({id:uid(),text:U[k].n+' ha accettato la tua richiesta di amicizia',t:now(),read:false,tab:'me'});save();render()}},7000)},
+  react:async(id,kind)=>{const p=db.posts.find(x=>x.id===id);if(!p)return;const on=kind==='confirm'?p.myConfirm:p.myResolve;
+    const ok=await run(on?sb.from('post_reactions').delete().eq('post_id',id).eq('user_id',myId).eq('kind',kind):sb.from('post_reactions').insert({post_id:id,user_id:myId,kind}),
+      on?null:kind==='confirm'?'Confermato ✓':'Segnato come risolto');if(ok)openThread(id)},
+  editName:()=>{const me=PROF[myId]||{};openModal(`<h3>Nome e nome utente</h3><p class="meta">Il nome compare accanto alle tue domande e risposte; il nome utente è unico.</p>
+    <form id="nameForm" novalidate><label for="nameIn">Nome</label><input id="nameIn" maxlength="40" required value="${esc(db.me.name||'')}">
+    <label for="userIn">Nome utente</label><div class="at"><span>@</span><input id="userIn" maxlength="20" autocapitalize="none" autocorrect="off" spellcheck="false" value="${esc(me.u||'')}"></div>
+    <p class="umsg" id="userMsg">Da 3 a 20 caratteri: lettere minuscole, numeri, punto e trattino basso.</p>
+    <div class="btns"><button type="button" class="sec" data-close>Annulla</button><button class="pri">Salva</button></div></form>`,'name');
+    watchUser($('#userIn'),$('#userMsg'));
+    $('#nameForm').onsubmit=async e=>{e.preventDefault();const v=$('#nameIn').value.trim(),u=$('#userIn').value.trim().toLowerCase();if(!v)return;
+      if(!(await checkUser(u,$('#userMsg'))))return;
+      if(await run(sb.from('profiles').update({display_name:v,username:u}).eq('id',myId),'Profilo salvato'))closeModal()};
+    setTimeout(()=>$('#nameIn').select(),60)},
+  profile:id=>openProfile(id),
+  mapF:id=>{mapF=id;renderMapUi();if(id==='friends'&&!friendLocs().length)toast('Nessun amico sta condividendo la posizione adesso')},
+  share:async id=>{const p=db.posts.find(x=>x.id===id);if(!p)return;const url=APP_URL+'#post='+id,text=(p.type==='n'?'Notizia':'Domanda')+' su '+p.place+': '+p.text;
+    try{if(navigator.share){await navigator.share({title:'App Locale',text,url});return}
+      await navigator.clipboard.writeText(text+'\n'+url);toast('Link copiato: incollalo dove vuoi')}catch(e){if(e&&e.name!=='AbortError')toast('Non riesco a condividere da qui')}},
+  showFriend:id=>{const l=LOC[id];if(!l)return;closeModal();setTab('map');map.setView([l.lat,l.lng],l.area?14:16)},
+  shareToggle:async()=>{const on=!wantShare();
+    if(!(await run(sb.from('profiles').update({share_location:on}).eq('id',myId),on?'Posizione visibile agli amici':'Posizione spenta: gli amici non la vedono più')))return;
+    if(on){lastShare=null;maybeShare(true)}else{lastShare=null;await sb.rpc('stop_sharing_location');await load();render()}},
+  sharePrec:async v=>{if(await run(sb.from('profiles').update({share_precision:v}).eq('id',myId),v==='area'?'Gli amici vedono solo la zona':'Gli amici vedono la posizione esatta')){lastShare=null;maybeShare(true)}},
+  toggle:k=>{db.me[k]=!db.me[k];save();render()},
+  set:(k,v)=>{db.me[k]=v;save();render()},
+  areaDel:i=>{db.me.areas.splice(+i,1);save();render()},
+  areaAdd:()=>{const n=placeLabel.split(' · ').pop()||'Zona attuale';if(!db.me.areas.includes(n))db.me.areas.push(n);save();render();toast('Segui '+n)},
+  reset:()=>openModal(`<h3>Ripristinare la demo?</h3><p class="meta">Cancella domande, risposte, amici e impostazioni salvati su questo telefono.</p>
+    <div class="btns"><button class="sec" data-close>Annulla</button><button class="pri" data-act="resetOk">Ripristina</button></div>`),
+  resetOk:()=>{const{places,posts}=db;db=seed();db.places=places;db.posts=posts;db.me.name=(PROF[myId]||{}).n||'';save();closeModal();reloadSoon();toast('Demo locale ripristinata')}
+};
+document.addEventListener('click',e=>{
+  const tb=e.target.closest('[data-tab]');if(tb){setTab(tb.dataset.tab);return}
+  if(e.target.closest('[data-close]')||e.target.id==='modal'){closeModal();return}
+  const sg=e.target.closest('[data-name] [data-v]');if(sg&&sg.type==='button'){sg.parentElement.querySelectorAll('[data-v]').forEach(x=>x.classList.toggle('on',x===sg));return}
+  const nr=e.target.closest('[data-n]');if(nr){const n=allN().find(x=>x.id===nr.dataset.n);if(n&&!n.read){n.read=true;
+    if(n.dbId)sb.from('notifications').update({read_at:iso(now())}).eq('id',n.dbId).then(()=>{});else save();render()}}
+  const a=e.target.closest('[data-act]');if(!a)return;e.preventDefault();
+  const f=actions[a.dataset.act];if(f)f(a.dataset.id,a.dataset.v,a);
+});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal()});
+
+setInterval(()=>{if(!myId)return;render();if(modalKind==='thread'&&openId&&!$('#ansText').value)openThread(openId)},60000);
+render();
+
+/* ---------- accesso ---------- */
+let signup=false,entered=false,recovering=/type=recovery/.test(location.hash);
+const aMsg=(t,k)=>{const e=$('#aMsg');e.textContent=t||'';e.className='amsg '+(k||'')};
+const showAuth=view=>{$('#auth').classList.remove('hide');['aMain','aNewPass','aDenied','aSetup'].forEach(x=>$('#'+x).classList.toggle('hide',x!==view))};
+const itErr=m=>/Invalid login/i.test(m)?'Email o password non corretti.':/Email not confirmed/i.test(m)?'Conferma prima l\'email: controlla la posta (anche lo spam).':/already registered/i.test(m)?'Questa email ha già un account: accedi.':/rate limit/i.test(m)?'Troppi tentativi: riprova tra qualche minuto.':/provider is not enabled/i.test(m)?'L\'accesso con Google non è ancora attivo: usa email e password.':m;
+async function enter(session){
+  if(recovering){showAuth('aNewPass');return}
+  if(entered)return;entered=true;
+  myId=session.user.id;myEmail=session.user.email||'';
+  const{data:ok,error}=await sb.rpc('is_member');
+  if(error||!ok){entered=false;$('#aWho').textContent=myEmail;showAuth('aDenied');if(error)aMsg(error.message,'err');return}
+  if(!(await load())){entered=false;return}
+  if(!(PROF[myId]||{}).u){showSetup();return}
+  openApp();
+}
+async function openApp(){
+  $('#auth').classList.add('hide');
+  subscribe();render();toast('Ciao '+(db.me.name||'')+'!');maybeShare(true);await initPush();render();routeHash();
+  const k='applocale_share_notice_'+myId;
+  if(wantShare()&&!localStorage.getItem(k)){try{localStorage.setItem(k,'1')}catch(e){}
+    openModal(`<h3>La tua posizione è visibile ai tuoi amici</h3><p class="meta">App Locale funziona intorno a dove sei: i tuoi amici ti vedono sulla mappa, gli altri no. Puoi spegnerla quando vuoi da Profilo → Posizione per gli amici.</p>
+      <div class="btns"><button class="sec" data-act="shareToggle">Spegnila</button><button class="pri" data-close>Va bene</button></div>`,'notice')}
+}
+function drawSetupAv(){$('#sAv').innerHTML=av('me','lg')+'<label for="avFile" aria-label="Aggiungi una foto profilo"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.2\" stroke-linejoin=\"round\"><path d=\"M4 8h3l2-3h6l2 3h3v11H4z\"/><circle cx=\"12\" cy=\"13\" r=\"3.5\"/></svg></label>'}
+let setupWatched=false;
+function showSetup(){
+  showAuth('aSetup');aMsg('');
+  const sugg=slug(myEmail.split('@')[0]).replace(/[.]{2,}/g,'.');
+  $('#sName').value='';$('#sName').placeholder='Come vuoi che ti vedano gli altri';$('#sUser').value=sugg.length>=3?sugg:(sugg+'.app').slice(0,20);
+  drawSetupAv();
+  if(!setupWatched){watchUser($('#sUser'),$('#sUserMsg'));setupWatched=true}
+  checkUser($('#sUser').value,$('#sUserMsg'));
+}
+$('#sShare').onclick=()=>{const b=$('#sShare');b.classList.toggle('on');b.setAttribute('aria-checked',b.classList.contains('on'))};
+$('#aSetup').onsubmit=async e=>{e.preventDefault();
+  const n=$('#sName').value.trim(),u=$('#sUser').value.trim().toLowerCase(),b=$('#sSave');
+  if(!n){aMsg('Scrivi il tuo nome.','err');return}
+  b.disabled=true;
+  if(!(await checkUser(u,$('#sUserMsg')))){b.disabled=false;return}
+  const shareOn=$('#sShare').classList.contains('on');
+  const{error}=await sb.from('profiles').update({display_name:n,username:u,onboarded_at:iso(now()),share_location:shareOn}).eq('id',myId);
+  try{localStorage.setItem('applocale_share_notice_'+myId,'1')}catch(e){}
+  b.disabled=false;
+  if(error){aMsg(/duplicate|unique/i.test(error.message)?'@'+u+' è appena stato preso, scegline un altro.':'Non salvato: '+error.message,'err');return}
+  await load();openApp();
+};
+$('#aSwitch').onclick=()=>{signup=!signup;$('#aSubmit').textContent=signup?'Crea l\'account':'Accedi';
+  $('#aSwitch').textContent=signup?'Hai già un account? Accedi':'Prima volta? Crea l\'account';
+  $('#aPass').autocomplete=signup?'new-password':'current-password';aMsg('')};
+$('#aForm').onsubmit=async e=>{e.preventDefault();const email=$('#aEmail').value.trim(),password=$('#aPass').value,b=$('#aSubmit');
+  b.disabled=true;aMsg(signup?'Creo l\'account…':'Accedo…');
+  const r=signup?await sb.auth.signUp({email,password,options:{emailRedirectTo:APP_URL}}):await sb.auth.signInWithPassword({email,password});
+  b.disabled=false;
+  if(r.error){aMsg(itErr(r.error.message),'err');return}
+  if(signup&&!r.data.session){aMsg('Fatto! Ti ho mandato un\'email: apri il link per confermare, poi accedi.','ok');return}
+  aMsg('');enter(r.data.session)};
+$('#aGoogle').onclick=async()=>{aMsg('Apro Google…');const{error}=await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:APP_URL}});if(error)aMsg(itErr(error.message),'err')};
+$('#aForgot').onclick=async()=>{const email=$('#aEmail').value.trim();if(!email){aMsg('Scrivi prima la tua email qui sopra.','err');return}
+  const{error}=await sb.auth.resetPasswordForEmail(email,{redirectTo:APP_URL});aMsg(error?itErr(error.message):'Ti ho mandato un\'email per scegliere una nuova password.',error?'err':'ok')};
+$('#aNewPass').onsubmit=async e=>{e.preventDefault();const{data,error}=await sb.auth.updateUser({password:$('#aPass2').value});
+  if(error){aMsg(itErr(error.message),'err');return}recovering=false;aMsg('Password aggiornata ✓','ok');const{data:{session}}=await sb.auth.getSession();if(session)enter(session)};
+$('#aOut').onclick=async()=>{await sb.auth.signOut();location.replace(APP_URL)};
+sb.auth.onAuthStateChange((ev,session)=>{
+  if(ev==='PASSWORD_RECOVERY'){recovering=true;showAuth('aNewPass');return}
+  if(ev==='SIGNED_IN'&&session)setTimeout(()=>enter(session),0);
+});
+(async()=>{const{data:{session}}=await sb.auth.getSession();if(session)enter(session);else showAuth('aMain')})();
+}
+</script>
+</body>
+</html>
