@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#F3F5F9" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0C1424" media="(prefers-color-scheme: dark)">
-<title>App Locale – V06</title>
+<title>App Locale – V07</title>
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-v6-180.png">
 <link rel="icon" type="image/png" href="icon-v6-192.png">
@@ -18,7 +18,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,650;12..96,800&display=swap">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>
-/* V06 prototipo – App Locale (Alessandro & Giovanni)
+/* V07 prototipo – App Locale (Alessandro & Giovanni). V07: nome utente unico scelto al primo accesso.
    Nuova grafica: mappa a tutto schermo, pin "a segnale" colorati per urgenza, tema chiaro/scuro,
    barra laterale su computer e iPad. Dati su Supabase (accesso, post, risposte, voti, conferme,
    amicizie, avvisi, foto profilo). Gruppi e impostazioni restano demo su questo telefono. */
@@ -145,7 +145,7 @@ img.av{display:inline-block}
 
 /* profilo */
 .hero-me{display:flex;align-items:center;gap:16px;margin-top:8px}
-.avwrap{position:relative;flex:none}
+.avwrap{position:relative;flex:none;display:inline-block}
 .avwrap label{position:absolute;right:-2px;bottom:-2px;width:34px;height:34px;border-radius:50%;background:var(--cobalt);color:var(--on-cobalt);display:grid;place-items:center;cursor:pointer;border:3px solid var(--paper);margin:0}
 .avwrap label svg{width:16px;height:16px}
 .namebtn{padding:0;min-height:0;text-align:left;border-radius:6px}
@@ -211,6 +211,11 @@ label{display:block;font-size:13px;font-weight:600;color:var(--mute);margin:16px
 .amsg{font-size:14px;margin:12px 0 0;min-height:20px}
 .amsg.err{color:var(--alert)}
 .amsg.ok{color:var(--calm)}
+.setup-av{margin:18px 0 2px}
+.at{position:relative}.at span{position:absolute;left:15px;top:50%;transform:translateY(-50%);color:var(--mute);font-weight:650;pointer-events:none}
+.at input{padding-left:32px;margin-top:0}
+.umsg{font-size:13px;margin:6px 0 0;color:var(--mute)}.umsg.ok{color:var(--calm)}.umsg.err{color:var(--alert)}
+.handle{font-size:15px;color:var(--mute);font-weight:500}
 
 /* ---------- tablet e computer ---------- */
 @media (max-width:380px){.round,.topav{width:46px;height:46px}.topav .av{width:40px;height:40px}.searchbar{height:46px;padding:0 14px}}
@@ -278,7 +283,7 @@ label{display:block;font-size:13px;font-weight:600;color:var(--mute);margin:16px
   <div class="abox">
     <img class="logo" src="icon-v6-192.png" alt="">
     <h1>App Locale</h1>
-    <p class="sub">Chiedi a chi è lì. Prototipo privato di Alessandro e Giovanni.</p>
+    <p class="sub">Chiedi a chi è lì. Prototipo in prova: entra con Google o crea un account con la tua email.</p>
     <div id="aMain">
       <button class="gbtn" id="aGoogle" type="button"><svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>Continua con Google</button>
       <div class="or">oppure con email</div>
@@ -292,18 +297,29 @@ label{display:block;font-size:13px;font-weight:600;color:var(--mute);margin:16px
         <button class="link" id="aForgot" type="button">Password dimenticata?</button>
       </div>
     </div>
+    <form id="aSetup" class="hide" novalidate>
+      <p style="font-family:var(--display);font-size:24px;font-weight:650;margin:4px 0 4px;letter-spacing:-.01em">Completa il profilo</p>
+      <p class="meta">Così gli altri sanno chi chiede e chi risponde. Puoi cambiare tutto dopo, dal Profilo.</p>
+      <div class="setup-av"><div class="avwrap" id="sAv"></div></div>
+      <label for="sName">Nome</label>
+      <input id="sName" maxlength="40" autocomplete="name" required>
+      <label for="sUser">Nome utente</label>
+      <div class="at"><span>@</span><input id="sUser" maxlength="20" autocapitalize="none" autocorrect="off" spellcheck="false" inputmode="email" required></div>
+      <p class="umsg" id="sUserMsg">Da 3 a 20 caratteri: lettere minuscole, numeri, punto e trattino basso.</p>
+      <button class="pri big" id="sSave">Entra nell'app</button>
+    </form>
     <form id="aNewPass" class="hide">
       <label for="aPass2">Scegli una nuova password</label>
       <input type="password" id="aPass2" minlength="6" autocomplete="new-password" required>
       <button class="pri big">Salva la nuova password</button>
     </form>
     <div id="aDenied" class="hide">
-      <p>L'account <b id="aWho"></b> non è tra i membri del prototipo.</p>
-      <p class="meta">Per ora possono entrare solo Alessandro e Giovanni. Se hai usato un'altra email, esci e riprova con quella giusta.</p>
+      <p>L'account <b id="aWho"></b> non ha accesso al prototipo.</p>
+      <p class="meta">Le registrazioni ora sono chiuse oppure l'accesso è stato tolto. Chiedi ad Alessandro o Giovanni di abilitarti, oppure esci e riprova con un altro account.</p>
       <button class="sec big" id="aOut" type="button">Esci</button>
     </div>
     <p class="amsg" id="aMsg" role="status"></p>
-    <p class="demo">Prototipo V06</p>
+    <p class="demo">Prototipo V07</p>
   </div>
 </div>
 
@@ -391,7 +407,7 @@ async function load(){
     sb.from('posts').select('id,kind,category,place_id,place_label,lat,lng,radius_m,body,author_id,demo_author,is_demo,demo_offset_min,base_votes,base_confirms,best_answer_id,created_at,expires_at').or(`is_demo.eq.true,expires_at.gt.${since}`),
     sb.from('answers').select('id,post_id,body,distance_m,author_id,demo_author,is_demo,demo_offset_min,base_votes,created_at'),
     sb.from('votes').select('user_id,post_id,answer_id'),
-    sb.from('profiles').select('id,display_name,color,avatar_url'),
+    sb.from('profiles').select('id,display_name,color,avatar_url,username'),
     sb.from('friendships').select('id,requester_id,addressee_id,status'),
     sb.from('notifications').select('id,kind,post_id,body,read_at,created_at').order('created_at',{ascending:false}).limit(100),
     sb.from('post_reactions').select('post_id,user_id,kind')
@@ -399,7 +415,7 @@ async function load(){
   $('#loading').classList.add('hide');
   const err=[pl,rp,po,an,vo,pr,fr,nt,rx].find(r=>r.error);
   if(err){toast('Errore dal database: '+err.error.message);return false}
-  PROF={};pr.data.forEach(p=>PROF[p.id]={n:p.display_name,c:p.color,a:p.avatar_url});
+  PROF={};pr.data.forEach(p=>PROF[p.id]={n:p.display_name,c:p.color,a:p.avatar_url,u:p.username});
   if(PROF[myId]){db.me.name=PROF[myId].n}
   FR=fr.data.map(f=>({id:f.id,other:f.requester_id===myId?f.addressee_id:f.requester_id,status:f.status,incoming:f.addressee_id===myId}));
   NOTIFS=nt.data.map(n=>({id:'db'+n.id,dbId:n.id,text:n.body,t:Date.parse(n.created_at),read:!!n.read_at,post:n.post_id,tab:n.kind.startsWith('friend')?'me':null}));
@@ -472,6 +488,21 @@ const pushTxt=()=>({on:'Attive su questo telefono: ricevi un avviso anche ad app
   unsupported:'Questo browser non supporta le notifiche push'})[pushState];
 function clearBadge(){try{navigator.clearAppBadge&&navigator.clearAppBadge()}catch(e){}}
 
+/* ---------- nome utente: formato e disponibilità ---------- */
+const U_RE=/^[a-z0-9._]{3,20}$/;
+const slug=t=>String(t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'.').replace(/^[.]+|[.]+$/g,'').slice(0,20);
+async function checkUser(u,msg){
+  const say=(t,k)=>{msg.textContent=t;msg.className='umsg '+(k||'')};
+  if(!U_RE.test(u)){say('Da 3 a 20 caratteri: lettere minuscole, numeri, punto e trattino basso.','err');return false}
+  const{data,error}=await sb.rpc('username_available',{p_username:u});
+  if(error){say('Non riesco a controllarlo ora, riprova.','err');return false}
+  if(!data){say('@'+u+' è già preso, prova un altro.','err');return false}
+  say('@'+u+' è libero ✓','ok');return true;
+}
+function watchUser(input,msg){let t=null;
+  input.addEventListener('input',()=>{const v=input.value.toLowerCase().replace(/[^a-z0-9._]/g,'');if(v!==input.value)input.value=v;
+    clearTimeout(t);t=setTimeout(()=>checkUser(v,msg),450)})}
+
 /* ---------- foto profilo: ritaglio quadrato 320 px, JPEG, nella cartella dell'utente ---------- */
 async function squareJpeg(file,size=320){
   const img=await new Promise((ok,ko)=>{const i=new Image();i.onload=()=>ok(i);i.onerror=ko;i.src=URL.createObjectURL(file)});
@@ -490,6 +521,7 @@ $('#avFile').addEventListener('change',async e=>{
     const url=sb.storage.from('avatars').getPublicUrl(path).data.publicUrl,old=(PROF[myId]||{}).a;
     if(await run(sb.from('profiles').update({avatar_url:url}).eq('id',myId),'Foto profilo aggiornata')){
       const m=old&&old.match(/\/avatars\/(.+)$/);if(m)sb.storage.from('avatars').remove([m[1]]);
+      if(!$('#aSetup').classList.contains('hide'))drawSetupAv();
     }
   }catch(err){toast('Questa immagine non si apre, provane un\'altra')}
 });
@@ -514,7 +546,7 @@ function toast(t){const e=$('#toast');e.textContent=t;e.classList.add('show');cl
 const alive=()=>db.posts.filter(p=>p.exp>now());
 const meU=()=>({n:db.me.name||'Io',c:(PROF[myId]||{}).c||'#3150F5',a:(PROF[myId]||{}).a});
 const user=id=>id==='me'?meU():U[id]||PROF[id]||{n:'Utente',c:'#6b7785'};
-const ini=n=>n.split(/\s+/).map(w=>w[0]).join('').slice(0,2).toUpperCase();
+const ini=n=>(String(n).match(/[\p{L}\p{N}]+/gu)||['?']).map(w=>w[0]).join('').slice(0,2).toUpperCase();
 const av=(id,cls='')=>{const u=user(id);return u.a?`<img class="av ${cls}" src="${esc(u.a)}" alt="" loading="lazy">`:`<span class="av ${cls}" style="background:${u.c}">${esc(ini(u.n))}</span>`};
 const placeOf=p=>db.places.find(x=>x.id===p.placeId);
 const isFriend=by=>by==='me'||db.friends[by]==='friend'||FR.some(f=>f.status==='accepted'&&f.other===by);
@@ -662,7 +694,7 @@ function renderMe(){
   const sw=(k,on)=>`<button class="sw ${on?'on':''}" data-act="toggle" data-id="${k}" role="switch" aria-checked="${on}" aria-label="${k}"></button>`;
   const seg=(k,opts)=>`<div class="seg">${opts.map(([v,l])=>`<button class="${String(db.me[k])===v?'on':''}" data-act="set" data-id="${k}" data-v="${v}">${l}</button>`).join('')}</div>`;
   $('#v-me').innerHTML=`<div class="hero-me"><div class="avwrap">${av('me','lg')}<label for="avFile" aria-label="Cambia la foto profilo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg></label></div>
-      <div><button class="namebtn" data-act="editName" aria-label="Cambia il nome"><h1>${esc(db.me.name||'Io')}</h1></button><div class="meta">${lvl}, ${pts} punti</div></div></div>
+      <div><button class="namebtn" data-act="editName" aria-label="Cambia il nome"><h1>${esc(db.me.name||'Io')}</h1></button><div class="handle">${(PROF[myId]||{}).u?'@'+esc(PROF[myId].u):''}</div><div class="meta">${lvl}, ${pts} punti</div></div></div>
     <div class="stats"><div><b>${mineQ}</b><span class="meta">Domande</span></div><div><b>${mineA}</b><span class="meta">Risposte</span></div><div><b>${nFriends}</b><span class="meta">Amici</span></div></div>
     <p class="meta">Guadagni punti quando rispondi da vicino e la tua risposta è votata utile. I punti danno più peso alle tue risposte.</p>
 
@@ -670,7 +702,7 @@ function renderMe(){
     <div class="box2">${FR.slice().sort((a,b)=>(b.incoming&&b.status==='pending')-(a.incoming&&a.status==='pending')).map(frRow).join('')}${fr.map(([k,s])=>`<div class="row">${av(k)}<div><b>${esc(U[k].n)}</b>${ex}<div class="meta">${s==='friend'?(U[k].b||U[k].rep+' punti'):'Vuole essere tua amica'}</div></div>
       ${s==='request'?`<button class="small pri" data-act="fAccept" data-id="${k}">Accetta</button><button class="small sec" data-act="fDecline" data-id="${k}">No</button>`:s==='sent'?'<span class="meta">Richiesta inviata</span>':`<button class="small sec" data-act="fRemove" data-id="${k}">Rimuovi</button>`}</div>`).join('')}</div>
     <div class="sec-t">Persone nell'app</div>
-    <div class="box2">${people.length?people.map(id=>`<div class="row">${av(id)}<div><b>${esc(user(id).n)}</b><div class="meta">Membro del prototipo</div></div><button class="small pri" data-act="rfAdd" data-id="${id}">Aggiungi</button></div>`).join(''):'<p class="empty">Siete già tutti amici o in attesa di risposta.</p>'}</div>
+    <div class="box2">${people.length?people.map(id=>`<div class="row">${av(id)}<div><b>${esc(user(id).n)}</b><div class="meta">${PROF[id].u?'@'+esc(PROF[id].u):'Membro del prototipo'}</div></div><button class="small pri" data-act="rfAdd" data-id="${id}">Aggiungi</button></div>`).join(''):'<p class="empty">Siete già tutti amici o in attesa di risposta.</p>'}</div>
     <div class="sec-t">Suggeriti</div>
     <div class="box2">${sugg.length?sugg.map(k=>`<div class="row">${av(k)}<div><b>${esc(U[k].n)}</b>${ex}<div class="meta">${U[k].rep} punti${U[k].b?' · '+U[k].b:''}</div></div><button class="small pri" data-act="fAdd" data-id="${k}">Aggiungi</button></div>`).join(''):'<p class="empty">Nessun suggerimento</p>'}</div>
 
@@ -897,10 +929,15 @@ const actions={
   react:async(id,kind)=>{const p=db.posts.find(x=>x.id===id);if(!p)return;const on=kind==='confirm'?p.myConfirm:p.myResolve;
     const ok=await run(on?sb.from('post_reactions').delete().eq('post_id',id).eq('user_id',myId).eq('kind',kind):sb.from('post_reactions').insert({post_id:id,user_id:myId,kind}),
       on?null:kind==='confirm'?'Confermato ✓':'Segnato come risolto');if(ok)openThread(id)},
-  editName:()=>{openModal(`<h3>Il tuo nome</h3><p class="meta">È il nome che vedono gli altri accanto alle tue domande e risposte.</p>
-    <form id="nameForm"><input id="nameIn" maxlength="40" required value="${esc(db.me.name||'')}"><div class="btns"><button type="button" class="sec" data-close>Annulla</button><button class="pri">Salva il nome</button></div></form>`,'name');
-    $('#nameForm').onsubmit=async e=>{e.preventDefault();const v=$('#nameIn').value.trim();if(!v)return;
-      if(await run(sb.from('profiles').update({display_name:v}).eq('id',myId),'Nome salvato'))closeModal()};
+  editName:()=>{const me=PROF[myId]||{};openModal(`<h3>Nome e nome utente</h3><p class="meta">Il nome compare accanto alle tue domande e risposte; il nome utente è unico.</p>
+    <form id="nameForm" novalidate><label for="nameIn">Nome</label><input id="nameIn" maxlength="40" required value="${esc(db.me.name||'')}">
+    <label for="userIn">Nome utente</label><div class="at"><span>@</span><input id="userIn" maxlength="20" autocapitalize="none" autocorrect="off" spellcheck="false" value="${esc(me.u||'')}"></div>
+    <p class="umsg" id="userMsg">Da 3 a 20 caratteri: lettere minuscole, numeri, punto e trattino basso.</p>
+    <div class="btns"><button type="button" class="sec" data-close>Annulla</button><button class="pri">Salva</button></div></form>`,'name');
+    watchUser($('#userIn'),$('#userMsg'));
+    $('#nameForm').onsubmit=async e=>{e.preventDefault();const v=$('#nameIn').value.trim(),u=$('#userIn').value.trim().toLowerCase();if(!v)return;
+      if(!(await checkUser(u,$('#userMsg'))))return;
+      if(await run(sb.from('profiles').update({display_name:v,username:u}).eq('id',myId),'Profilo salvato'))closeModal()};
     setTimeout(()=>$('#nameIn').select(),60)},
   toggle:k=>{db.me[k]=!db.me[k];save();render()},
   set:(k,v)=>{db.me[k]=v;save();render()},
@@ -927,7 +964,7 @@ render();
 /* ---------- accesso ---------- */
 let signup=false,entered=false,recovering=/type=recovery/.test(location.hash);
 const aMsg=(t,k)=>{const e=$('#aMsg');e.textContent=t||'';e.className='amsg '+(k||'')};
-const showAuth=view=>{$('#auth').classList.remove('hide');['aMain','aNewPass','aDenied'].forEach(x=>$('#'+x).classList.toggle('hide',x!==view))};
+const showAuth=view=>{$('#auth').classList.remove('hide');['aMain','aNewPass','aDenied','aSetup'].forEach(x=>$('#'+x).classList.toggle('hide',x!==view))};
 const itErr=m=>/Invalid login/i.test(m)?'Email o password non corretti.':/Email not confirmed/i.test(m)?'Conferma prima l\'email: controlla la posta (anche lo spam).':/already registered/i.test(m)?'Questa email ha già un account: accedi.':/rate limit/i.test(m)?'Troppi tentativi: riprova tra qualche minuto.':/provider is not enabled/i.test(m)?'L\'accesso con Google non è ancora attivo: usa email e password.':m;
 async function enter(session){
   if(recovering){showAuth('aNewPass');return}
@@ -935,9 +972,34 @@ async function enter(session){
   myId=session.user.id;myEmail=session.user.email||'';
   const{data:ok,error}=await sb.rpc('is_member');
   if(error||!ok){entered=false;$('#aWho').textContent=myEmail;showAuth('aDenied');if(error)aMsg(error.message,'err');return}
-  $('#auth').classList.add('hide');
-  if(await load()){subscribe();render();toast('Ciao '+(db.me.name||'')+'!');await initPush();render();routeHash()}
+  if(!(await load())){entered=false;return}
+  if(!(PROF[myId]||{}).u){showSetup();return}
+  openApp();
 }
+async function openApp(){
+  $('#auth').classList.add('hide');
+  subscribe();render();toast('Ciao '+(db.me.name||'')+'!');await initPush();render();routeHash();
+}
+function drawSetupAv(){$('#sAv').innerHTML=av('me','lg')+'<label for="avFile" aria-label="Aggiungi una foto profilo"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.2\" stroke-linejoin=\"round\"><path d=\"M4 8h3l2-3h6l2 3h3v11H4z\"/><circle cx=\"12\" cy=\"13\" r=\"3.5\"/></svg></label>'}
+let setupWatched=false;
+function showSetup(){
+  showAuth('aSetup');aMsg('');
+  const n=(PROF[myId]||{}).n||'',sugg=slug(n).length>=3?slug(n):slug(myEmail.split('@')[0]);
+  $('#sName').value=n;$('#sUser').value=sugg.length>=3?sugg:(sugg+'.app').slice(0,20);
+  drawSetupAv();
+  if(!setupWatched){watchUser($('#sUser'),$('#sUserMsg'));setupWatched=true}
+  checkUser($('#sUser').value,$('#sUserMsg'));
+}
+$('#aSetup').onsubmit=async e=>{e.preventDefault();
+  const n=$('#sName').value.trim(),u=$('#sUser').value.trim().toLowerCase(),b=$('#sSave');
+  if(!n){aMsg('Scrivi il tuo nome.','err');return}
+  b.disabled=true;
+  if(!(await checkUser(u,$('#sUserMsg')))){b.disabled=false;return}
+  const{error}=await sb.from('profiles').update({display_name:n,username:u,onboarded_at:iso(now())}).eq('id',myId);
+  b.disabled=false;
+  if(error){aMsg(/duplicate|unique/i.test(error.message)?'@'+u+' è appena stato preso, scegline un altro.':'Non salvato: '+error.message,'err');return}
+  await load();openApp();
+};
 $('#aSwitch').onclick=()=>{signup=!signup;$('#aSubmit').textContent=signup?'Crea l\'account':'Accedi';
   $('#aSwitch').textContent=signup?'Hai già un account? Accedi':'Prima volta? Crea l\'account';
   $('#aPass').autocomplete=signup?'new-password':'current-password';aMsg('')};
