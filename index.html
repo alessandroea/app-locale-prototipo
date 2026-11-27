@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#F3F5F9" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0C1424" media="(prefers-color-scheme: dark)">
-<title>App Locale – V07</title>
+<title>App Locale – V08</title>
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-v6-180.png">
 <link rel="icon" type="image/png" href="icon-v6-192.png">
@@ -18,7 +18,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,650;12..96,800&display=swap">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>
-/* V07 prototipo – App Locale (Alessandro & Giovanni). V07: nome utente unico scelto al primo accesso.
+/* V08 prototipo – App Locale (Alessandro & Giovanni). V08: profilo delle persone, posizione condivisa con gli amici (solo se attivata), usabilità.
    Nuova grafica: mappa a tutto schermo, pin "a segnale" colorati per urgenza, tema chiaro/scuro,
    barra laterale su computer e iPad. Dati su Supabase (accesso, post, risposte, voti, conferme,
    amicizie, avvisi, foto profilo). Gruppi e impostazioni restano demo su questo telefono. */
@@ -69,8 +69,11 @@ a{color:var(--cobalt)}
 .sheet{position:fixed;z-index:10;left:0;right:0;bottom:calc(var(--tab) + env(safe-area-inset-bottom));background:var(--surface);border-radius:28px 28px 0 0;box-shadow:0 -10px 40px -20px rgba(15,27,51,.5);padding:6px 16px 12px;max-height:46vh;display:flex;flex-direction:column}
 .grab{display:block;width:100%;min-height:22px;padding:0;margin:0 0 2px;border-radius:0}
 .grab::before{content:'';display:block;width:44px;height:5px;border-radius:3px;background:var(--line);margin:0 auto}
-.sheet>*{flex:none}.sheet>.list{flex:1 1 auto;min-height:0}
-.sheet.min .scroll-x,.sheet.min .list,.sheet.min .h{display:none}
+.sheet>*{flex:none}
+.sheet{overflow-y:auto;overscroll-behavior:contain;transition:max-height .25s ease}
+.sheet.max{max-height:84vh}
+.sheet>.grab{position:sticky;top:-6px;background:var(--surface);z-index:2;margin-top:-6px;padding-top:6px;min-height:28px}
+.sheet.min .scroll-x,.sheet.min .list,.sheet.min .h,.sheet.min #friendsBox{display:none}
 .here{display:flex;align-items:center;gap:12px;width:100%;padding:4px 0 8px;text-align:left;border-radius:0;min-height:0}
 .here b{display:block;font-family:var(--display);font-size:22px;font-weight:650;letter-spacing:-.02em;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .here small{display:block;color:var(--mute);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -82,8 +85,8 @@ a{color:var(--cobalt)}
 .scroll-x::-webkit-scrollbar{display:none}
 .pc{flex:none;background:var(--surface2);border-radius:16px;padding:10px 12px;text-align:left;min-width:156px;max-width:210px;display:flex;flex-direction:column;gap:3px}
 .pc b{display:block;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.list{overflow-y:auto;flex:1;margin:0 -16px;padding:0 16px}
-.ask{margin-top:10px;background:var(--cobalt);color:var(--on-cobalt);font-family:var(--display);font-weight:650;width:100%;min-height:54px;font-size:18px;border-radius:18px;display:flex;align-items:center;justify-content:center;gap:8px;letter-spacing:-.01em}
+.list{margin:0 -16px;padding:0 16px}
+.ask{position:sticky;bottom:0;box-shadow:0 -10px 20px -6px var(--surface);margin-top:10px;background:var(--cobalt);color:var(--on-cobalt);font-family:var(--display);font-weight:650;width:100%;min-height:54px;font-size:18px;border-radius:18px;display:flex;align-items:center;justify-content:center;gap:8px;letter-spacing:-.01em}
 .ask svg{width:20px;height:20px}
 
 /* ---------- barra delle sezioni ---------- */
@@ -211,6 +214,28 @@ label{display:block;font-size:13px;font-weight:600;color:var(--mute);margin:16px
 .amsg{font-size:14px;margin:12px 0 0;min-height:20px}
 .amsg.err{color:var(--alert)}
 .amsg.ok{color:var(--calm)}
+/* V08 */
+.who[data-act],.pick{cursor:pointer}
+.pick{display:flex;align-items:center;gap:12px;flex:1;min-width:0}
+.fpin{position:relative;display:flex;flex-direction:column;align-items:center;gap:3px;transform:translate(-50%,-50%)}
+.fpin .av{width:44px;height:44px;border:3px solid #fff;box-shadow:0 4px 14px rgba(15,27,51,.4);font-size:15px}
+.fpin.on .av{border-color:var(--calm)}
+.fpin.on::before{content:'';position:absolute;top:-4px;width:52px;height:52px;border-radius:50%;border:3px solid var(--calm);animation:ping 2.4s ease-out infinite}
+.fpin b{font:650 11px/1 -apple-system,system-ui,sans-serif;background:var(--surface);color:var(--ink);padding:4px 7px;border-radius:99px;box-shadow:0 2px 6px rgba(15,27,51,.25);white-space:nowrap}
+.fchip{flex:none;display:flex;align-items:center;gap:8px;background:var(--surface2);border-radius:99px;padding:5px 14px 5px 5px;min-height:42px;text-align:left}
+.fchip .av{width:32px;height:32px;font-size:12px}
+.fchip small{display:block;color:var(--mute);font-size:12px}
+.locbox{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:16px;background:var(--surface2);margin-top:14px}
+.locbox>div{flex:1;min-width:0}
+.ldot{width:12px;height:12px;border-radius:50%;background:var(--done);flex:none}
+.ldot.on{background:var(--calm);box-shadow:0 0 0 5px color-mix(in srgb,var(--calm) 22%,transparent)}
+.pstats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:14px 0 4px}
+.pstats div{background:var(--surface2);border-radius:14px;padding:10px;text-align:center}
+.pstats b{display:block;font-family:var(--display);font-size:22px;font-weight:800}
+.composer{position:sticky;bottom:calc(-18px - env(safe-area-inset-bottom));background:var(--surface);margin:12px -18px 0;padding:10px 18px calc(env(safe-area-inset-bottom) + 12px);border-top:1px solid var(--line)}
+.composer textarea{min-height:64px}
+.composer .btns{margin-top:10px}
+.qbox{margin:0 0 8px}
 .setup-av{margin:18px 0 2px}
 .at{position:relative}.at span{position:absolute;left:15px;top:50%;transform:translateY(-50%);color:var(--mute);font-weight:650;pointer-events:none}
 .at input{padding-left:32px;margin-top:0}
@@ -254,6 +279,7 @@ label{display:block;font-size:13px;font-weight:600;color:var(--mute);margin:16px
     <button class="here" data-act="here"><span class="live" aria-hidden="true"></span><span style="flex:1;min-width:0"><b id="placeName">Sto cercando dove sei…</b><small id="placeSub">Consenti l'accesso alla posizione</small></span></button>
     <div class="h">Posti con stato live <span id="plCount"></span></div>
     <div class="scroll-x" id="placesRow"></div>
+    <div id="friendsBox" class="hide"><div class="h">Amici sulla mappa <span id="fCount"></span></div><div class="scroll-x" id="friendsRow"></div></div>
     <div class="h">Domande e notizie <span id="count"></span></div>
     <div class="list" id="list"></div>
     <button class="ask" data-act="ask"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Chiedi a chi è qui</button>
@@ -319,7 +345,7 @@ label{display:block;font-size:13px;font-weight:600;color:var(--mute);margin:16px
       <button class="sec big" id="aOut" type="button">Esci</button>
     </div>
     <p class="amsg" id="aMsg" role="status"></p>
-    <p class="demo">Prototipo V07</p>
+    <p class="demo">Prototipo V08</p>
   </div>
 </div>
 
@@ -333,7 +359,7 @@ const SB_URL='https://tigxpqmedwlwthomvunb.supabase.co';
 const SB_KEY='sb_publishable_np6dcaeo0Hbbd63wlzb1FQ_Nz5_ryoU';
 const APP_URL=location.origin+location.pathname;
 const sb=supabase.createClient(SB_URL,SB_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
-let myId=null,myEmail='',PROF={},FR=[],NOTIFS=[];
+let myId=null,myEmail='',PROF={},FR=[],NOTIFS=[],LOC={};
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const now=()=>Date.now();
@@ -401,7 +427,7 @@ const iso=ms=>new Date(ms).toISOString();
 async function load(){
   $('#loading').classList.remove('hide');
   const since=iso(now()-6*H);
-  const [pl,rp,po,an,vo,pr,fr,nt,rx]=await Promise.all([
+  const [pl,rp,po,an,vo,pr,fr,nt,rx,lc]=await Promise.all([
     sb.from('places').select('id,name,category,lat,lng,info'),
     sb.from('place_reports').select('place_id,status,is_demo,demo_offset_min,created_at').or(`is_demo.eq.true,created_at.gt.${since}`),
     sb.from('posts').select('id,kind,category,place_id,place_label,lat,lng,radius_m,body,author_id,demo_author,is_demo,demo_offset_min,base_votes,base_confirms,best_answer_id,created_at,expires_at').or(`is_demo.eq.true,expires_at.gt.${since}`),
@@ -410,13 +436,15 @@ async function load(){
     sb.from('profiles').select('id,display_name,color,avatar_url,username'),
     sb.from('friendships').select('id,requester_id,addressee_id,status'),
     sb.from('notifications').select('id,kind,post_id,body,read_at,created_at').order('created_at',{ascending:false}).limit(100),
-    sb.from('post_reactions').select('post_id,user_id,kind')
+    sb.from('post_reactions').select('post_id,user_id,kind'),
+    sb.from('locations').select('user_id,lat,lng,accuracy_m,precision,share_until,updated_at')
   ]);
   $('#loading').classList.add('hide');
-  const err=[pl,rp,po,an,vo,pr,fr,nt,rx].find(r=>r.error);
+  const err=[pl,rp,po,an,vo,pr,fr,nt,rx,lc].find(r=>r.error);
   if(err){toast('Errore dal database: '+err.error.message);return false}
   PROF={};pr.data.forEach(p=>PROF[p.id]={n:p.display_name,c:p.color,a:p.avatar_url,u:p.username});
   if(PROF[myId]){db.me.name=PROF[myId].n}
+  LOC={};lc.data.forEach(l=>{const until=l.share_until?Date.parse(l.share_until):null;LOC[l.user_id]={lat:l.lat,lng:l.lng,acc:l.accuracy_m,area:l.precision==='area',until,t:Date.parse(l.updated_at)}});
   FR=fr.data.map(f=>({id:f.id,other:f.requester_id===myId?f.addressee_id:f.requester_id,status:f.status,incoming:f.addressee_id===myId}));
   NOTIFS=nt.data.map(n=>({id:'db'+n.id,dbId:n.id,text:n.body,t:Date.parse(n.created_at),read:!!n.read_at,post:n.post_id,tab:n.kind.startsWith('friend')?'me':null}));
   const T=r=>r.is_demo?now()-(r.demo_offset_min||0)*M:Date.parse(r.created_at);
@@ -444,6 +472,7 @@ function reloadSoon(){clearTimeout(reloadT);reloadT=setTimeout(async()=>{if(awai
 function refreshModal(){
   if(modalKind==='thread'&&openId){const ta=$('#ansText');if(!ta||!ta.value)openThread(openId)}
   if(modalKind==='place'&&openId)openPlace(openId);
+  if(modalKind==='profile'&&openId)openProfile(openId);
 }
 async function run(promise,okMsg){
   const{data,error}=await promise;
@@ -455,7 +484,7 @@ async function run(promise,okMsg){
 /* ---------- tempo reale: le novità arrivano subito; gli avvisi li crea il database ---------- */
 function subscribe(){
   const ch=sb.channel('app-locale-live');
-  ['posts','answers','votes','place_reports','friendships','post_reactions','profiles'].forEach(t=>ch.on('postgres_changes',{event:'*',schema:'public',table:t},()=>reloadSoon()));
+  ['posts','answers','votes','place_reports','friendships','post_reactions','profiles','locations'].forEach(t=>ch.on('postgres_changes',{event:'*',schema:'public',table:t},()=>reloadSoon()));
   ch.on('postgres_changes',{event:'INSERT',schema:'public',table:'notifications',filter:'user_id=eq.'+myId},e=>{toast(String(e.new.body||'Nuovo avviso').slice(0,90));reloadSoon()});
   ch.subscribe();
 }
@@ -487,6 +516,26 @@ const pushTxt=()=>({on:'Attive su questo telefono: ricevi un avviso anche ad app
   denied:'Bloccate: riattivale da Impostazioni → Notifiche → App Locale',
   unsupported:'Questo browser non supporta le notifiche push'})[pushState];
 function clearBadge(){try{navigator.clearAppBadge&&navigator.clearAppBadge()}catch(e){}}
+
+/* ---------- posizione condivisa con gli amici (solo se attivata) ---------- */
+let myAcc=null,lastShare=null;
+const mySharing=()=>{const l=LOC[myId];return !!(l&&(!l.until||l.until>now()))};
+const isLive=l=>now()-l.t<5*M;
+function maybeShare(){
+  if(!myId||!me||!mySharing())return;
+  const moved=lastShare?dist(lastShare,me):1e9,age=lastShare?now()-lastShare.t:1e9;
+  if(moved<120&&age<60e3)return;
+  lastShare={lat:me.lat,lng:me.lng,t:now()};
+  sb.rpc('share_location',{p_lat:me.lat,p_lng:me.lng,p_accuracy:Math.round(myAcc||30),p_precision:LOC[myId].area?'area':'exact',p_hours:-1}).then(()=>{});
+}
+setInterval(()=>{lastShare&&(lastShare.t=0);maybeShare()},120e3);
+const geoCache={};
+async function placeName(lat,lng){
+  const k=lat.toFixed(3)+','+lng.toFixed(3);if(geoCache[k])return geoCache[k];
+  try{const r=await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=16&accept-language=it`);const j=await r.json(),a=j.address||{};
+    return geoCache[k]=[a.road||a.pedestrian||a.neighbourhood||a.suburb,a.city||a.town||a.village].filter(Boolean).join(', ')||'Posizione sulla mappa'}catch(e){return 'Posizione sulla mappa'}
+}
+function friendLocs(){return Object.entries(LOC).filter(([id])=>id!==myId).map(([id,l])=>({id,...l}))}
 
 /* ---------- nome utente: formato e disponibilità ---------- */
 const U_RE=/^[a-z0-9._]{3,20}$/;
@@ -567,7 +616,7 @@ const meIcon=L.divIcon({className:'',html:'<div class="me-pin"></div>',iconSize:
 let me=null,meMarker=null,accCircle=null,simMode=false,gpsPos=null,followed=false,placeLabel='Posizione attuale',lastLook=null;
 
 function setMe(lat,lng,acc,sim){
-  me={lat,lng};
+  me={lat,lng};myAcc=acc;maybeShare();
   if(!meMarker){meMarker=L.marker([lat,lng],{icon:meIcon,zIndexOffset:1000}).addTo(map);accCircle=L.circle([lat,lng],{radius:acc||30,color:'#1677ff',weight:1,fillOpacity:.08,interactive:false}).addTo(map)}
   else{meMarker.setLatLng([lat,lng]);accCircle.setLatLng([lat,lng])}
   accCircle.setRadius(sim?15:Math.min(acc||30,300));
@@ -609,6 +658,12 @@ function renderMap(){
     const ic=L.divIcon({className:'',html:`<div class="q-pin u-${u} ${fresh?'fresh':''} ${p.resolved?'res':''}">${p.resolved?'✓':p.type==='n'?'!':'?'}</div>`,iconSize:[36,36],iconAnchor:[18,18]});
     L.marker([p.lat,p.lng],{icon:ic}).on('click',()=>openThread(p.id)).addTo(layer);
   });
+  friendLocs().forEach(f=>{
+    const live=isLive(f);
+    if(f.area)L.circle([f.lat,f.lng],{radius:1000,color:'#1F9D63',weight:1,fillOpacity:.04,interactive:false}).addTo(layer);
+    const ic=L.divIcon({className:'',html:`<div class="fpin ${live?'on':''}">${av(f.id)}<b>${esc(user(f.id).n.split(' ')[0])}, ${live?'ora':ago(f.t)}</b></div>`,iconSize:[0,0]});
+    L.marker([f.lat,f.lng],{icon:ic,zIndexOffset:800}).on('click',()=>openProfile(f.id)).addTo(layer);
+  });
 }
 const withD=arr=>arr.map(x=>({...x,d:me?dist(me,x):null}));
 function typeTags(p){const u=urgOf(p);
@@ -618,7 +673,7 @@ function typeTags(p){const u=urgOf(p);
 function postCard(p,full){
   const u=user(p.by),n=p.answers.length;
   return`<button class="card ${p.resolved?'res':''}" data-act="thread" data-id="${esc(p.id)}">
-    <div class="who">${av(p.by)}<div><b>${esc(u.n)}</b><div class="meta">${esc(p.place)}, ${ago(p.t)}</div></div></div>
+    <div class="who"><span class="who" data-act="profile" data-id="${esc(p.by)}">${av(p.by)}<b>${esc(u.n)}</b></span></div><div class="meta" style="margin:2px 0 0 44px">${esc(p.place)}, ${ago(p.t)}</div>
     <p class="ptxt">${esc(p.text)}</p>
     <div class="facts">${typeTags(p)}<span>${n} rispost${n===1?'a':'e'}</span>${p.confirms?`<span>${p.confirms===1?'1 conferma':p.confirms+' confermano'}</span>`:''}${p.votes?`<span>${p.votes===1?'1 utile':p.votes+' utili'}</span>`:''}${p.d!=null?`<span>a ${fmtD(p.d)}</span>`:''}${full&&!p.resolved?`<span>scade tra ${left(p.exp)}</span>`:''}</div></button>`;
 }
@@ -627,6 +682,10 @@ function renderMapUi(){
   const pls=withD(db.places).sort((a,b)=>(a.d??0)-(b.d??0));
   $('#placesRow').innerHTML=pls.map(pl=>`<button class="pc" data-act="place" data-id="${pl.id}"><b>${esc(pl.name)}</b>${stHtml(pl)}<span class="meta">${pl.d!=null?fmtD(pl.d):esc(pl.cat)}</span></button>`).join('');
   $('#plCount').textContent=pls.filter(pl=>status(pl)).length+' con segnalazioni';
+  const fl=withD(friendLocs()).sort((a,b)=>(a.d??0)-(b.d??0));
+  $('#friendsBox').classList.toggle('hide',!fl.length);
+  $('#fCount').textContent=fl.filter(isLive).length?fl.filter(isLive).length+' live':'';
+  $('#friendsRow').innerHTML=fl.map(f=>`<button class="fchip" data-act="showFriend" data-id="${f.id}">${av(f.id)}<span><b>${esc(user(f.id).n)}</b><small>${f.d!=null?fmtD(f.d)+', ':''}${isLive(f)?'live':ago(f.t)}</small></span></button>`).join('');
   const list=withD(alive()).sort((a,b)=>(a.d??0)-(b.d??0));
   $('#count').textContent=list.length+' attive';
   $('#list').innerHTML=list.length?list.map(p=>postCard(p)).join('')+'<p class="demo">“Esempio” indica le conversazioni demo; le altre sono vostre.</p>':'<p class="empty">Qui intorno è tutto tranquillo. Fai tu la prima domanda.</p>';
@@ -647,7 +706,7 @@ function render(){
   if(tab==='feed')renderFeed();
   if(tab==='groups')renderGroups();
   if(tab==='act')renderAct();
-  if(tab==='me')renderMe();
+  if(tab==='me'){renderMe();bindPeopleSearch()}
 }
 function renderFeed(){
   let list=withD(alive());
@@ -681,6 +740,8 @@ function renderAct(){
       <span class="st"><i style="background:${n.read?'#c3cad2':'var(--acc)'}"></i></span><div><div style="font-weight:${n.read?400:600}">${esc(n.text)}</div><div class="meta">${ago(n.t)}</div></div></div>`).join('')}</div>
     <div class="btns"><button class="sec" data-act="readAll">Segna tutte come lette</button></div>`;
 }
+function bindPeopleSearch(){const q=$('#peopleQ');if(!q)return;q.oninput=()=>{const v=q.value.trim().toLowerCase().replace(/^@/,'');
+  document.querySelectorAll('#peopleBox .row').forEach(r=>r.classList.toggle('hide',!!v&&!r.dataset.q.includes(v)))}}
 function renderMe(){
   const mineQ=db.posts.filter(p=>p.by==='me').length,mineA=db.posts.reduce((s,p)=>s+p.answers.filter(a=>a.by==='me').length,0);
   const pts=myPoints(),lvl=pts>=100?'Esperto di zona':pts>=30?'Informatore':'Nuovo arrivato';
@@ -689,7 +750,7 @@ function renderMe(){
   const known=new Set(FR.map(f=>f.other)),people=Object.keys(PROF).filter(id=>id!==myId&&!known.has(id));
   const nFriends=fr.filter(f=>f[1]==='friend').length+FR.filter(f=>f.status==='accepted').length;
   const ex=' <span class="tag cat">Esempio</span>';
-  const frRow=f=>`<div class="row">${av(f.other)}<div><b>${esc(user(f.other).n)}</b><div class="meta">${f.status==='accepted'?'Amico':f.incoming?'Vuole essere tuo amico':'Richiesta inviata'}</div></div>
+  const frRow=f=>`<div class="row"><div class="pick" data-act="profile" data-id="${f.other}">${av(f.other)}<div><b>${esc(user(f.other).n)}</b><div class="meta">${f.status==='accepted'?(LOC[f.other]?(isLive(LOC[f.other])?'Posizione live':'Ultima posizione '+ago(LOC[f.other].t)):(PROF[f.other]||{}).u?'@'+esc(PROF[f.other].u):'Amico'):f.incoming?'Vuole essere tuo amico':'Richiesta inviata'}</div></div></div>
       ${f.status==='accepted'?`<button class="small sec" data-act="rfDel" data-id="${f.id}">Rimuovi</button>`:f.incoming?`<button class="small pri" data-act="rfAccept" data-id="${f.id}">Accetta</button><button class="small sec" data-act="rfDel" data-id="${f.id}">No</button>`:`<button class="small sec" data-act="rfDel" data-id="${f.id}">Annulla</button>`}</div>`;
   const sw=(k,on)=>`<button class="sw ${on?'on':''}" data-act="toggle" data-id="${k}" role="switch" aria-checked="${on}" aria-label="${k}"></button>`;
   const seg=(k,opts)=>`<div class="seg">${opts.map(([v,l])=>`<button class="${String(db.me[k])===v?'on':''}" data-act="set" data-id="${k}" data-v="${v}">${l}</button>`).join('')}</div>`;
@@ -702,14 +763,20 @@ function renderMe(){
     <div class="box2">${FR.slice().sort((a,b)=>(b.incoming&&b.status==='pending')-(a.incoming&&a.status==='pending')).map(frRow).join('')}${fr.map(([k,s])=>`<div class="row">${av(k)}<div><b>${esc(U[k].n)}</b>${ex}<div class="meta">${s==='friend'?(U[k].b||U[k].rep+' punti'):'Vuole essere tua amica'}</div></div>
       ${s==='request'?`<button class="small pri" data-act="fAccept" data-id="${k}">Accetta</button><button class="small sec" data-act="fDecline" data-id="${k}">No</button>`:s==='sent'?'<span class="meta">Richiesta inviata</span>':`<button class="small sec" data-act="fRemove" data-id="${k}">Rimuovi</button>`}</div>`).join('')}</div>
     <div class="sec-t">Persone nell'app</div>
-    <div class="box2">${people.length?people.map(id=>`<div class="row">${av(id)}<div><b>${esc(user(id).n)}</b><div class="meta">${PROF[id].u?'@'+esc(PROF[id].u):'Membro del prototipo'}</div></div><button class="small pri" data-act="rfAdd" data-id="${id}">Aggiungi</button></div>`).join(''):'<p class="empty">Siete già tutti amici o in attesa di risposta.</p>'}</div>
+    ${people.length>3?'<input id="peopleQ" class="qbox" type="search" placeholder="Cerca per nome o @nome utente" autocomplete="off">':''}
+    <div class="box2" id="peopleBox">${people.length?people.map(id=>`<div class="row" data-q="${esc((user(id).n+' '+(PROF[id].u||'')).toLowerCase())}"><div class="pick" data-act="profile" data-id="${id}">${av(id)}<div><b>${esc(user(id).n)}</b><div class="meta">${PROF[id].u?'@'+esc(PROF[id].u):'Membro del prototipo'}</div></div></div><button class="small pri" data-act="rfAdd" data-id="${id}">Aggiungi</button></div>`).join(''):'<p class="empty">Siete già tutti amici o in attesa di risposta.</p>'}</div>
     <div class="sec-t">Suggeriti</div>
     <div class="box2">${sugg.length?sugg.map(k=>`<div class="row">${av(k)}<div><b>${esc(U[k].n)}</b>${ex}<div class="meta">${U[k].rep} punti${U[k].b?' · '+U[k].b:''}</div></div><button class="small pri" data-act="fAdd" data-id="${k}">Aggiungi</button></div>`).join(''):'<p class="empty">Nessun suggerimento</p>'}</div>
 
+    <div class="sec-t">Posizione per gli amici</div>
+    <div class="box2">
+      <div class="row"><span class="ldot ${mySharing()?'on':''}"></span><div><b>${mySharing()?'La stai condividendo':'Non la stai condividendo'}</b><div class="meta">${mySharing()?`Con ${FR.filter(f=>f.status==='accepted').length} amic${FR.filter(f=>f.status==='accepted').length===1?'o':'i'}, ${LOC[myId].area?'solo la zona (~1 km)':'posizione esatta'}, ${LOC[myId].until?'fino alle '+new Date(LOC[myId].until).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'}):'finché non la spegni'}. Si aggiorna mentre l'app è aperta; poi resta l'ultima.`:'Solo i tuoi amici possono vederla, e solo se la attivi tu. Nessun altro, mai.'}</div></div>
+      ${mySharing()?'<button class="small sec" data-act="shareStop">Smetti</button>':'<button class="small pri" data-act="shareStart">Attiva</button>'}</div>
+    </div>
     <div class="sec-t">Privacy</div>
     <div class="box2">
       <div class="row"><div><b>Modalità anonima <span class="phase">Fase 2</span></b><div class="meta">Nel prototipo gli altri vedono il tuo nome</div></div>${sw('anon',db.me.anon)}</div>
-      <div class="row" style="display:block"><b>Precisione mostrata agli altri</b><div class="meta" style="margin-bottom:8px">La tua posizione esatta non è mai visibile</div>${seg('precision',[['200','~200 m'],['1000','Quartiere'],['5000','Città']])}</div>
+      <div class="row"><div><b>Le tue domande e risposte</b><div class="meta">I post liberi sono salvati arrotondati a circa 100 m; quando rispondi gli altri vedono solo quanto eri distante.</div></div></div>
     </div>
     <div class="sec-t">Notifiche</div>
     <div class="box2">
@@ -727,7 +794,39 @@ function renderMe(){
       <div class="row"><div><b>Utenti bloccati</b><div class="meta">${(db.blocked||[]).length} bloccati</div></div></div>
       <div class="row"><button class="small sec red" data-act="reset">Ripristina gruppi, amici e impostazioni demo</button></div>
     </div>
-    <p class="demo">Prototipo V06. Domande, risposte, voti, conferme, amicizie, avvisi e foto sono nel database; gruppi e impostazioni restano su questo telefono.</p>`;
+    <p class="demo">Prototipo V08. Domande, risposte, voti, conferme, amicizie, avvisi e foto sono nel database; gruppi e impostazioni restano su questo telefono.</p>`;
+}
+
+/* ---------- profilo di una persona ---------- */
+async function openProfile(id){
+  if(!id)return;
+  if(id==='me'||id===myId){closeModal();setTab('me');return}
+  const demo=!!U[id],u=user(id),pr=PROF[id]||{},fr=FR.find(f=>f.other===id),loc=LOC[id],friends=fr&&fr.status==='accepted';
+  const posts=db.posts.filter(x=>x.by===id).sort((a,b)=>b.t-a.t).slice(0,5);
+  let btn;
+  if(demo){const st=db.friends[id];btn=st==='friend'?'<button class="sec" disabled>Amici (esempio)</button>':`<button class="pri" data-act="fAdd" data-id="${id}">Aggiungi agli amici</button>`}
+  else if(!fr)btn=`<button class="pri" data-act="rfAdd" data-id="${id}">Aggiungi agli amici</button>`;
+  else if(friends)btn=`<button class="sec" data-act="rfDel" data-id="${fr.id}">Rimuovi dagli amici</button>`;
+  else if(fr.incoming)btn=`<button class="pri" data-act="rfAccept" data-id="${fr.id}">Accetta l'amicizia</button>`;
+  else btn=`<button class="sec" data-act="rfDel" data-id="${fr.id}">Annulla la richiesta</button>`;
+  const locHtml=demo?'':friends?(loc?`<div class="locbox"><span class="ldot ${isLive(loc)?'on':''}"></span><div><b>${isLive(loc)?'Posizione live':'Ultima posizione'}</b><div class="meta"><span id="locLabel">…</span>${loc.area?' (zona)':''}, ${isLive(loc)?'aggiornata ora':ago(loc.t)}</div></div><button class="small pri" data-act="showFriend" data-id="${id}">Mappa</button></div>`
+      :'<div class="locbox"><span class="ldot"></span><div><b>Posizione non condivisa</b><div class="meta">La vedrai qui se decide di condividerla con gli amici.</div></div></div>')
+    :'<div class="locbox"><span class="ldot"></span><div><b>Posizione privata</b><div class="meta">Diventate amici: la vedrai solo se decide di condividerla.</div></div></div>';
+  openModal(`<div class="hero-me">${av(id,'lg')}<div><h3 style="margin:0">${esc(u.n)}</h3><div class="handle">${demo?'Utente di esempio':pr.u?'@'+esc(pr.u):''}</div><div class="meta" id="pSince"></div></div></div>
+    <div class="pstats" id="pStats"><div><b>…</b><span class="meta">Domande</span></div><div><b>…</b><span class="meta">Risposte</span></div><div><b>…</b><span class="meta">Utili</span></div></div>
+    <div class="btns" style="margin-top:8px">${btn}</div>
+    ${locHtml}
+    <label>${posts.length?'Attive adesso':'Nessuna domanda attiva adesso'}</label>
+    ${posts.map(p=>postCard(p)).join('')}
+    <div class="btns"><button class="sec" data-close>Chiudi</button></div>`,'profile');
+  openId=id;
+  if(demo){$('#pStats').innerHTML=`<div><b>${posts.length}</b><span class="meta">Domande</span></div><div><b>${db.posts.reduce((s,p)=>s+p.answers.filter(a=>a.by===id).length,0)}</b><span class="meta">Risposte</span></div><div><b>${u.rep||0}</b><span class="meta">Punti</span></div>`;return}
+  const{data}=await sb.rpc('profile_stats',{p_user:id});const st=data&&data[0];
+  if(st&&openId===id&&modalKind==='profile'){
+    $('#pStats').innerHTML=`<div><b>${st.posts}</b><span class="meta">Domande</span></div><div><b>${st.answers}</b><span class="meta">Risposte</span></div><div><b>${st.helpful}</b><span class="meta">Utili ricevuti</span></div>`;
+    if(st.since)$('#pSince').textContent='Nell\'app da '+new Date(st.since).toLocaleDateString('it-IT',{day:'numeric',month:'long'})+(st.best?(st.best===1?', 1 risposta migliore':', '+st.best+' risposte migliori'):'');
+  }
+  if(loc&&friends){const n=await placeName(loc.lat,loc.lng);const el=$('#locLabel');if(el)el.textContent=n}
 }
 
 /* ---------- modale ---------- */
@@ -788,7 +887,7 @@ function openThread(id){
   const u=user(p.by),d=me?dist(me,p):null,inside=d!=null&&d<=p.radius;
   const answers=p.answers.slice().sort((a,b)=>(b.best-a.best)||(b.votes-a.votes)||(a.t-b.t));
   const draft=$('#ansText')&&openId===id?$('#ansText').value:'';
-  openModal(`<div class="who">${av(p.by)}<div><b>${esc(u.n)}</b><div class="meta">${ago(p.t)} · scade tra ${left(p.exp)}</div></div></div>
+  openModal(`<div class="who" data-act="profile" data-id="${esc(p.by)}">${av(p.by)}<div><b>${esc(u.n)}</b><div class="meta">${ago(p.t)}, scade tra ${left(p.exp)}</div></div></div>
     <div class="facts" style="margin-top:12px">${typeTags(p)}</div>
     <h3>${esc(p.text)}</h3>
     <div class="meta">📍 ${p.placeId?`<a href="#" data-act="place" data-id="${p.placeId}">${esc(p.place)}</a>`:esc(p.place)} · zona ${fmtD(p.radius)}</div>
@@ -797,15 +896,15 @@ function openThread(id){
     <div class="acts"><button class="${p.voted?'on':''}" data-act="voteP" data-id="${p.id}">▲ Utile ${p.votes}</button><button class="${p.follow?'on':''}" data-act="follow" data-id="${p.id}">${p.follow?'Segui ✓':'Segui'}</button>${p.by!=='me'?`<button data-act="flag" data-id="${p.by}">Segnala</button>`:`<button class="red" data-act="del" data-id="${p.id}">Elimina</button>`}</div>
     <label>${answers.length} rispost${answers.length===1?'a':'e'}</label>
     ${answers.length?answers.map(a=>{const au=user(a.by),near=a.d!=null&&a.d<=p.radius;return`<div class="ans ${a.best?'best':''}">
-      <div class="who">${av(a.by)}<b>${esc(au.n)}</b>${near?'<span class="near">Era lì</span>':''}${a.best?'<span class="near">Migliore</span>':''}</div>
+      <div class="who"><span class="who" data-act="profile" data-id="${esc(a.by)}">${av(a.by)}<b>${esc(au.n)}</b></span>${near?'<span class="near">Era lì</span>':''}${a.best?'<span class="near">Migliore</span>':''}</div>
       <p>${esc(a.text)}</p><div class="meta">${a.d!=null?'da '+fmtD(a.d)+' dal posto':'distanza non nota'} · ${ago(a.t)}${a.demo?' · esempio':''}</div>
       <div class="acts"><button class="${a.voted?'on':''}" data-act="voteA" data-id="${p.id}" data-v="${a.id}">▲ Utile ${a.votes}</button>
       ${p.by==='me'&&!a.best&&a.by!=='me'?`<button data-act="best" data-id="${p.id}" data-v="${a.id}">Segna migliore</button>`:''}
       ${a.by!=='me'?`<button data-act="flag" data-id="${a.by}">Segnala</button>`:`<button class="red" data-act="delA" data-id="${p.id}" data-v="${a.id}">Elimina</button>`}</div></div>`}).join(''):'<p class="empty">Ancora nessuna risposta. Chi è in zona riceve un avviso.</p>'}
-    <label for="ansText">Rispondi ${d!=null?'(sei a '+fmtD(d)+')':''}</label>
-    <textarea id="ansText" maxlength="280" placeholder="Scrivi cosa vedi da lì">${esc(draft)}</textarea>
-    ${inside?'':'<div class="warn">Sei fuori dalla zona: la tua risposta non avrà il bollino “Era lì”. Con ⊕ puoi simulare di essere lì.</div>'}
-    <div class="btns"><button class="sec" data-close>Chiudi</button><button class="pri" data-act="sendAns" data-id="${p.id}">Invia risposta</button></div>`,'thread');
+    <div class="composer">
+    ${inside?'':'<div class="warn" style="margin:0 0 8px">Sei fuori dalla zona: la tua risposta non avrà il bollino “Era lì”.</div>'}
+    <textarea id="ansText" maxlength="280" aria-label="Rispondi" placeholder="Rispondi${d!=null?' (sei a '+fmtD(d)+')':''}: cosa vedi da lì?">${esc(draft)}</textarea>
+    <div class="btns"><button class="sec" data-close>Chiudi</button><button class="pri" data-act="sendAns" data-id="${p.id}">Invia risposta</button></div></div>`,'thread');
   openId=id;
 }
 
@@ -876,7 +975,7 @@ const actions={
   locate:()=>{if(me)map.setView([me.lat,me.lng],16);else toast('Posizione non ancora trovata')},
   sim:()=>{simMode=!simMode;$('#btnSim').classList.toggle('on',simMode);$('#simBadge').classList.toggle('hide',!simMode);
     if(!simMode&&gpsPos)setMe(gpsPos.lat,gpsPos.lng,gpsPos.acc);toast(simMode?'Tocca la mappa per spostarti':'Torno al GPS')},
-  sheet:()=>$('#sheet').classList.toggle('min'),
+  sheet:()=>{const sh=$('#sheet');if(sh.classList.contains('min'))sh.classList.remove('min');else if(sh.classList.contains('max')){sh.classList.remove('max');sh.classList.add('min')}else sh.classList.add('max')},
   tab:id=>{closeModal();setTab(id)},
   feedF:id=>{feedF=id;render()},feedCat:id=>{feedCat=id;render()},
   readAll:async()=>{db.notifs.forEach(n=>n.read=true);save();const ids=NOTIFS.filter(n=>!n.read).map(n=>n.dbId);clearBadge();
@@ -939,6 +1038,19 @@ const actions={
       if(!(await checkUser(u,$('#userMsg'))))return;
       if(await run(sb.from('profiles').update({display_name:v,username:u}).eq('id',myId),'Profilo salvato'))closeModal()};
     setTimeout(()=>$('#nameIn').select(),60)},
+  profile:id=>openProfile(id),
+  showFriend:id=>{const l=LOC[id];if(!l)return;closeModal();setTab('map');map.setView([l.lat,l.lng],l.area?14:16)},
+  shareStart:()=>{
+    if(!me){toast('Serve la tua posizione: consenti l\'accesso o usa ⊕ sulla mappa');return}
+    const nf=FR.filter(f=>f.status==='accepted').length;
+    openModal(`<h3>Condividi la posizione</h3><p class="meta">La vedranno solo i tuoi ${nf} amic${nf===1?'o':'i'}. Si aggiorna mentre l'app è aperta; quando la chiudi resta visibile l'ultima posizione, fino alla scadenza.</p>
+      <form id="shareForm"><label>Cosa vedono</label><div class="seg" data-name="prec"><button type="button" class="on" data-v="exact">Posizione esatta</button><button type="button" data-v="area">Solo la zona (~1 km)</button></div>
+      <label>Per quanto tempo</label><div class="seg" data-name="dur"><button type="button" class="on" data-v="1">1 ora</button><button type="button" data-v="8">8 ore</button><button type="button" data-v="0">Finché la spengo</button></div>
+      <div class="btns"><button type="button" class="sec" data-close>Annulla</button><button class="pri">Condividi</button></div></form>`,'share');
+    const f=$('#shareForm');f.onsubmit=async e=>{e.preventDefault();const v=n=>f.querySelector(`[data-name="${n}"] .on`).dataset.v;
+      lastShare={lat:me.lat,lng:me.lng,t:now()};
+      if(await run(sb.rpc('share_location',{p_lat:me.lat,p_lng:me.lng,p_accuracy:Math.round(myAcc||30),p_precision:v('prec'),p_hours:+v('dur')}),'Posizione condivisa con gli amici'))closeModal()}},
+  shareStop:async()=>{lastShare=null;await run(sb.rpc('stop_sharing_location'),'Non condividi più la posizione')},
   toggle:k=>{db.me[k]=!db.me[k];save();render()},
   set:(k,v)=>{db.me[k]=v;save();render()},
   areaDel:i=>{db.me.areas.splice(+i,1);save();render()},
@@ -984,8 +1096,8 @@ function drawSetupAv(){$('#sAv').innerHTML=av('me','lg')+'<label for="avFile" ar
 let setupWatched=false;
 function showSetup(){
   showAuth('aSetup');aMsg('');
-  const n=(PROF[myId]||{}).n||'',sugg=slug(n).length>=3?slug(n):slug(myEmail.split('@')[0]);
-  $('#sName').value=n;$('#sUser').value=sugg.length>=3?sugg:(sugg+'.app').slice(0,20);
+  const sugg=slug(myEmail.split('@')[0]).replace(/[.]{2,}/g,'.');
+  $('#sName').value='';$('#sName').placeholder='Come vuoi che ti vedano gli altri';$('#sUser').value=sugg.length>=3?sugg:(sugg+'.app').slice(0,20);
   drawSetupAv();
   if(!setupWatched){watchUser($('#sUser'),$('#sUserMsg'));setupWatched=true}
   checkUser($('#sUser').value,$('#sUserMsg'));
