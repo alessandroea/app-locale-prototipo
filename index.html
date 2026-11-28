@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#F3F5F9" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0C1424" media="(prefers-color-scheme: dark)">
-<title>App Locale – V11</title>
+<title>App Locale – V12</title>
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-v6-180.png">
 <link rel="icon" type="image/png" href="icon-v6-192.png">
@@ -196,6 +196,15 @@ label{display:block;font-size:13px;font-weight:600;color:var(--mute);margin:16px
 .maplibregl-ctrl-attrib{font-size:10px}
 .maplibregl-ctrl-bottom-right{bottom:calc(var(--tab) + env(safe-area-inset-bottom) + 6px)}
 .mk{position:relative;overflow:visible;cursor:pointer}
+/* V12 */
+.eta{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.eta .chip2{display:inline-flex;align-items:center;gap:6px;background:var(--surface2);border-radius:12px;padding:8px 12px;font-size:14px}
+.eta .chip2 b{font-weight:700}
+.eta .late{color:var(--alert);font-weight:600}
+.open{color:var(--calm);font-weight:700}.closed{color:var(--alert);font-weight:700}
+.ev-pin{min-width:34px;height:28px;padding:0 7px;border-radius:14px;border:2px solid #fff;display:flex;align-items:center;gap:4px;justify-content:center;color:#fff;font:800 12px/1 -apple-system,system-ui,sans-serif;box-shadow:0 3px 10px rgba(0,0,0,.35)}
+.ev-pin.ok{background:#1F9D63}.ev-pin.full{background:#E5484D}.ev-pin.unk{background:#6b7280}
+.spot-info{margin-top:8px;display:grid;gap:4px}
 /* V11 */
 .q-pin.sos{font-size:11px;letter-spacing:-.02em}
 .q-pin.glow::before{content:"";position:absolute;inset:-14px;border-radius:50%;background:radial-gradient(circle,color-mix(in srgb,var(--c) 45%,transparent),transparent 70%);z-index:-1;animation:breathe 2.8s ease-in-out infinite}
@@ -393,7 +402,7 @@ label{display:block;font-size:13px;font-weight:600;color:var(--mute);margin:16px
       <button class="sec big" id="aOut" type="button">Esci</button>
     </div>
     <p class="amsg" id="aMsg" role="status"></p>
-    <p class="demo">Prototipo V11</p>
+    <p class="demo">Prototipo V12</p>
   </div>
 </div>
 
@@ -646,10 +655,66 @@ function openLayers(){
     ${row('d3',PREF.d3,'Vista 3D','Mappa inclinata con gli edifici in rilievo. Con due dita giri e inclini la mappa.')}
     ${row('traffic',PREF.traffic,'Traffico dal vivo','Strade colorate: verde scorre, rosso coda. Aggiornato ogni minuto (TomTom).')}
     ${row('cams',PREF.cams,'Webcam','Immagini delle webcam pubbliche nella zona che stai guardando (Windy).')}
+    ${row('reach',PREF.reach,'Dove arrivo in '+(PREF.reachMin||15)+' minuti','L\'area che raggiungi in auto da dove sei, col traffico di adesso (TomTom).')}
+    ${PREF.reach?`<div class="row" style="display:block"><div class="seg">${[10,15,30].map(m=>`<button class="${(PREF.reachMin||15)===m?'on':''}" data-act="reachMin" data-id="${m}">${m} min</button>`).join('')}</div></div>`:''}
+    ${row('ev',PREF.ev,'Colonnine elettriche','Colonnine di ricarica nella zona, con le prese libere adesso: verde libera, rossa occupata (TomTom).')}
     ${row('sim',simMode,'Modalità prova','Sposta la tua posizione toccando la mappa, per provare l\'app da un altro posto.')}
     <div class="row" data-act="layer" data-id="replay"><div><b>Riavvolgi 24 ore</b><div class="meta">Rivedi cosa è successo in zona: domande e notizie compaiono e si spengono nel tempo.</div></div><span class="meta">›</span></div>
     </div><div class="btns"><button class="pri" data-close>Fatto</button></div>`,'layers');
 }
+/* ---------- V12: servizi TomTom (ricerca, quanto ci metto, dove arrivo, colonnine) ---------- */
+const svc=q=>fetch(`${SB_URL}/functions/v1/servizi?${q}`,{headers:{Authorization:'Bearer '+jwt,apikey:SB_KEY}}).then(r=>r.json());
+const hm=d=>d.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'});
+function hoursTxt(h){if(!h||!h.length)return'';const nowD=new Date(),pad=n=>String(n).padStart(2,'0');
+  const toD=t=>new Date(`${t.date}T${pad(t.hour)}:${pad(t.minute)}:00`);
+  for(const r of h){const a=toD(r.startTime),b=toD(r.endTime);if(nowD>=a&&nowD<b)return`<span class="open">Aperto ora</span> · chiude alle ${hm(b)}`}
+  const nx=h.map(r=>toD(r.startTime)).filter(a=>a>nowD).sort((a,b)=>a-b)[0];if(!nx)return'<span class="closed">Chiuso</span>';
+  const same=nx.toDateString()===nowD.toDateString(),tom=nx.toDateString()===new Date(Date.now()+864e5).toDateString();
+  return`<span class="closed">Chiuso</span> · apre ${same?'':tom?'domani ':nx.toLocaleDateString('it-IT',{weekday:'long'})+' '}alle ${hm(nx)}`}
+async function fillEta(el,t){if(!el)return;
+  if(!me){el.innerHTML='';return}
+  const d=dist(me,t);if(d<150){el.innerHTML='<span class="chip2">Sei già qui</span>';return}
+  el.innerHTML='<span class="meta">Calcolo quanto ci metti da qui…</span>';
+  try{const r=await svc(`a=percorso&lat=${me.lat.toFixed(5)}&lng=${me.lng.toFixed(5)}&tlat=${t.lat.toFixed(5)}&tlng=${t.lng.toFixed(5)}`);
+    if(!r.attiva||(!r.auto&&!r.piedi)){el.innerHTML='';return}
+    const mins=m=>m>=60?Math.floor(m/60)+' h '+(m%60?m%60+' min':''):m+' min';
+    el.innerHTML=(r.auto?`<span class="chip2">In auto <b>${mins(r.auto.min)}</b>${r.auto.ritardo_min>=2?` <span class="late">+${r.auto.ritardo_min} di traffico</span>`:''} · ${String(r.auto.km).replace('.',',')} km</span>`:'')+
+      (r.piedi&&r.piedi.min<=120?`<span class="chip2">A piedi <b>${mins(r.piedi.min)}</b></span>`:'')}
+  catch(e){el.innerHTML=''}}
+/* dove arrivo in N minuti */
+let REACH=null;
+function drawReach(){const src=ml.getSource('reach'),fc={type:'FeatureCollection',features:REACH&&REACH.length>2?[{type:'Feature',properties:{},geometry:{type:'Polygon',coordinates:[[...REACH.map(p=>[p[1],p[0]]),[REACH[0][1],REACH[0][0]]]]}}]:[]};
+  if(src){src.setData(fc);return}if(!ml.isStyleLoaded())return;
+  ml.addSource('reach',{type:'geojson',data:fc});
+  ml.addLayer({id:'reach-fill',type:'fill',source:'reach',paint:{'fill-color':'#6C84FF','fill-opacity':.14}},ml.getLayer('circ-fill')?'circ-fill':undefined);
+  ml.addLayer({id:'reach-line',type:'line',source:'reach',paint:{'line-color':'#3150F5','line-width':2.5,'line-dasharray':[2,1.5]}},ml.getLayer('circ-fill')?'circ-fill':undefined)}
+async function setReach(on){PREF.reach=!!on;savePref();
+  if(!on){REACH=null;drawReach();return}
+  if(!me){toast('Serve la tua posizione per calcolare dove arrivi');PREF.reach=false;savePref();return}
+  toast('Calcolo dove arrivi in '+(PREF.reachMin||15)+' minuti…');
+  try{const r=await svc(`a=raggio&lat=${me.lat.toFixed(5)}&lng=${me.lng.toFixed(5)}&min=${PREF.reachMin||15}`);
+    if(r.attiva===false){toast('Da attivare: serve la chiave TomTom');PREF.reach=false;savePref();return}
+    REACH=r.area||[];drawReach();if(REACH.length){const la=REACH.map(p=>p[0]),lo=REACH.map(p=>p[1]);map.fitBounds([[Math.min(...la),Math.min(...lo)],[Math.max(...la),Math.max(...lo)]])}
+    toast(`In blu: dove arrivi in ${PREF.reachMin||15} minuti in auto, col traffico di adesso`)}catch(e){toast('Non riesco a calcolarlo adesso')}}
+/* colonnine di ricarica */
+let EVS=[],evTimer=null,evAt=null;
+async function loadEv(force){
+  if(!PREF.ev){evLayer.clearLayers();EVS=[];return}
+  const c=ml.getCenter(),b=ml.getBounds(),r=Math.min(10,Math.max(1,dist({lat:b.getNorth(),lng:b.getWest()},{lat:b.getSouth(),lng:b.getEast()})/2000));
+  if(!force&&evAt&&dist(evAt,{lat:c.lat,lng:c.lng})<r*300)return;evAt={lat:c.lat,lng:c.lng};
+  try{const j=await svc(`a=colonnine&lat=${c.lat.toFixed(4)}&lng=${c.lng.toFixed(4)}&r=${r.toFixed(1)}`);
+    if(j.attiva===false){toast('Colonnine da attivare: serve la chiave TomTom');PREF.ev=false;savePref();return}
+    EVS=j.colonnine||[];evLayer.clearLayers();
+    EVS.forEach(e=>{const cls=!e.noto?'unk':e.lib>0?'ok':'full';
+      L.marker([e.lat,e.lng],{icon:L.divIcon({html:`<div class="ev-pin ${cls}">⚡${e.noto?e.lib+'/'+e.tot:''}</div>`,iconSize:[0,0],iconAnchor:[0,0]}),zIndexOffset:400}).on('click',()=>openEv(e.id)).addTo(evLayer)});
+    if(force&&!EVS.length)toast('Nessuna colonnina in questa zona')}catch(e){if(force)toast('Colonnine non disponibili adesso')}}
+function openEv(id){const e=EVS.find(x=>x.id===id);if(!e)return;
+  openModal(`<span class="tag cat">Colonnina di ricarica</span><h3>${esc(e.nome)}</h3><div class="meta">${esc(e.ind)}</div>
+    <div class="why"><div class="hint ${e.noto&&!e.lib?'hot':''}"><b>${e.noto?(e.lib?`${e.lib} su ${e.tot} prese libere adesso`:`Tutte le ${e.tot} prese occupate adesso`):'Disponibilità non nota'}</b>${e.kw?`<div class="meta" style="margin-top:4px">Fino a ${Math.round(e.kw)} kW</div>`:''}</div></div>
+    <div class="eta" id="evEta"></div>
+    <p class="meta" style="margin-top:10px">Dati TomTom, aggiornati di continuo.</p>
+    <div class="btns"><button class="sec" data-close>Chiudi</button><button class="pri" data-act="whyAsk" data-v="${e.lat},${e.lng}" data-id="${esc(e.nome)}">Chiedi a chi è lì</button></div>`,'ev');
+  fillEta($('#evEta'),e)}
 /* ---------- Perché? Possibili motivi in un posto (traffico, scioperi, meteo, metro di Londra, webcam, community) ---------- */
 let WHYCAMS=[];
 async function openWhy(lat,lng,label){
@@ -674,6 +739,7 @@ async function openWhy(lat,lng,label){
     <div class="meta">Aggiornato alle ${new Date().toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'})}${geo.city||geo.town||geo.village?' · '+esc(geo.city||geo.town||geo.village):''}</div>
     <div class="hint ${motivi.length?'hot':''}"><b>${motivi.length?'Possibili motivi':'Nessun motivo ufficiale trovato'}</b>
       ${motivi.length?motivi.map(m=>`<div style="margin-top:6px">• ${m}</div>`).join(''):'<div class="meta" style="margin-top:4px">Le fonti ufficiali non segnalano niente di strano: chiedilo a chi è lì, risponde chi è in zona.</div>'}</div>
+    <h4>Quanto ci metti adesso</h4><div class="eta" id="whyEta"></div>
     ${cams.length?`<h4>Guarda adesso</h4><img class="camimg" src="${esc(cams[0].img)}" alt="Webcam" data-act="camWhy" data-id="${cams[0].id}"><div class="meta">${esc(cams[0].title||'')} · a ${fmtD(cams[0].d)} · <a href="${esc(cams[0].url)}" target="_blank" rel="noopener">Windy.com</a>${cams.length>1?` · <a href="#" data-act="camsHere" data-v="${lat},${lng}">altre ${cams.length-1} sulla mappa</a>`:''}</div>`:''}
     <h4>Traffico e strade</h4>${d.traffico&&d.traffico.attiva===false?off('Da attivare: serve la chiave gratuita di TomTom (Profilo → Servizi della mappa).'):inc.length?inc.map(i=>`<div class="item"><b>${esc(i.tipo)}${i.strada?' · '+esc(i.strada):''}</b><span class="meta">${i.testo?esc(i.testo)+'. ':''}${i.da?esc(i.da)+(i.a?' → '+esc(i.a):'')+'. ':''}${i.ritardo_s>=60?Math.round(i.ritardo_s/60)+' min di ritardo · ':''}a ${fmtD(i.d)}</span></div>`).join(''):d.traffico?off('Nessun incidente o coda segnalati entro 4–5 km.'):off('Non disponibile adesso.')}
     ${cc==='it'?`<h4>Scioperi dei trasporti (oggi e prossimi 2 giorni)</h4>${sc.length?sc.map(x=>`<div class="item"><b>${x.oggi?'Oggi':esc(x.quando)} · ${esc(x.settore)}${x.qui>=2?' · in zona':''}</b><span class="meta">${esc(x.chi)}. ${esc(x.modalita||'')}${x.zona&&x.zona!=='Italia'?' ('+esc(x.zona)+')':''}</span></div>`).join(''):off('Nessuno sciopero dei trasporti in programma qui.')}`:''}
@@ -682,7 +748,7 @@ async function openWhy(lat,lng,label){
     <h4>Dalla community (entro 2 km)</h4>${posts.length?posts.slice(0,3).map(p=>postCard(p)).join(''):off('Ancora nessuna domanda o notizia qui.')}
     <p class="meta" style="margin-top:12px">Fonti: TomTom, Windy, Open-Meteo, Ministero dei Trasporti (dati aperti di onData), TfL. Possono non essere aggiornate al minuto.</p>
     <div class="btns"><button class="sec" data-close>Chiudi</button><button class="pri" data-act="whyAsk" data-v="${lat},${lng}" data-id="${esc(label||'')}">Chiedi a chi è lì</button></div></div>`,'why');
-  openId=key;
+  openId=key;fillEta($('#whyEta'),here);if(!me)$('#whyEta').previousElementSibling.remove();
 }
 /* ---------- volantino con QR per SOS e smarriti ---------- */
 function loadScript(src){return new Promise((ok,ko)=>{if(document.querySelector(`script[src="${src}"]`))return ok();const sc=document.createElement('script');sc.src=src;sc.onload=ok;sc.onerror=ko;document.head.appendChild(sc)})}
@@ -819,7 +885,7 @@ function addOverlays(){ // dopo ogni cambio di stile
     ml.addLayer({id:'b3d',type:'fill-extrusion',source:'openmaptiles','source-layer':'building',minzoom:14,
       paint:{'fill-extrusion-color':dark?'#24314f':'#e3dfd8','fill-extrusion-height':['coalesce',['get','render_height'],8],
         'fill-extrusion-base':['coalesce',['get','render_min_height'],0],'fill-extrusion-opacity':dark?.85:.75}},'circ-fill')}}catch(e){}
-  setTraffic(PREF.traffic,true);flushCircles();
+  setTraffic(PREF.traffic,true);flushCircles();if(REACH)drawReach();
 }
 ml.on('style.load',addOverlays);
 window.__ml=ml; // utile per le prove dal browser
@@ -845,7 +911,9 @@ const map={
   removeLayer(x){x&&x.remove&&x.remove();return map},
   on(ev,fn){if(ev==='click')ml.on('click',e=>fn({latlng:{lat:e.lngLat.lat,lng:e.lngLat.lng}}));return map},
 };
-const layer=L.layerGroup().addTo(map),camLayer=L.layerGroup().addTo(map);
+const layer=L.layerGroup().addTo(map),camLayer=L.layerGroup().addTo(map),evLayer=L.layerGroup().addTo(map);
+ml.on('moveend',()=>{if(PREF.ev){clearTimeout(evTimer);evTimer=setTimeout(()=>loadEv(false),700)}});
+ml.on('load',()=>{if(PREF.ev)loadEv(true);if(PREF.reach)setTimeout(()=>{if(me)setReach(true)},2500)});
 function set3D(on){PREF.d3=on;savePref();ml.easeTo({pitch:on?50:0,duration:700})}
 /* traffico dal vivo (TomTom, tramite la funzione "servizi" che tiene la chiave sul server) */
 function setTraffic(on,quiet){PREF.traffic=!!on;savePref();
@@ -1157,7 +1225,7 @@ function renderMe(){
       <div class="row"><div><b>Utenti bloccati</b><div class="meta">${(db.blocked||[]).length} bloccati</div></div></div>
       <div class="row"><button class="small sec red" data-act="reset">Ripristina amici e impostazioni di esempio</button></div>
     </div>
-    <p class="demo">Prototipo V11. Domande, risposte, foto, gruppi, zone seguite, amicizie e avvisi sono nel database; restano su questo telefono solo gli amici di esempio e alcune impostazioni.</p>`;
+    <p class="demo">Prototipo V12. Domande, risposte, foto, gruppi, zone seguite, amicizie e avvisi sono nel database; restano su questo telefono solo gli amici di esempio e alcune impostazioni.</p>`;
 }
 
 /* ---------- profilo di una persona ---------- */
@@ -1204,6 +1272,7 @@ function openPlace(id){
   openModal(`<span class="tag cat">${esc(pl.cat)}</span><h3>${esc(pl.name)}</h3>
     <div class="meta">${d!=null?'a '+fmtD(d)+' da te · ':''}${s?`${REP[s.type].l.toLowerCase()} secondo ${s.n} segnalazion${s.n===1?'e':'i'} nell'ultima ora`:'nessuna segnalazione nell\'ultima ora'}</div>
     <div style="margin-top:6px">${stHtml(pl)}</div>
+    <div class="eta" id="plEta"></div>
     <button class="sec" style="width:100%;margin-top:12px" data-act="whyAt" data-v="${pl.lat},${pl.lng}" data-id="${esc(pl.name)}"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" style="vertical-align:-3px;margin-right:4px"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .8-1 1.5v.7M12 17h.01"/></svg>Perché? Cerca i motivi qui</button>
     <dl class="kv">${pl.info.map(([k,v])=>`<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>
     <label>Sei qui? Segnala com'è adesso</label>
@@ -1214,7 +1283,7 @@ function openPlace(id){
     ${posts.length?posts.map(p=>postCard(p)).join(''):'<p class="empty">Ancora nessuna. Fai la prima domanda.</p>'}
     <div class="btns"><button class="sec" data-close>Chiudi</button><button class="pri" data-act="askPlace" data-id="${pl.id}" data-v="">Chiedi a chi è lì</button></div>
     <p class="demo">Info e segnalazioni di esempio</p>`,'place');
-  openId=id;
+  openId=id;fillEta($('#plEta'),pl);
   map.panTo([pl.lat,pl.lng]);
 }
 
@@ -1304,11 +1373,14 @@ function openSearch(){
   $('#q').oninput=()=>{delete $('#qgeo').dataset.done;draw()};
   $('#qf').onsubmit=async e=>{e.preventDefault();const q=$('#q').value.trim();if(q.length<2)return;$('#q').blur();
     const box=$('#qgeo');box.dataset.done='1';box.innerHTML='<p class="meta" style="margin-top:12px">Cerco nel mondo…</p>';
-    try{const r=await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(q)}&limit=8&accept-language=it`);
-      const j=await r.json();
-      geoRes=j.map(x=>({name:x.name||String(x.display_name).split(',')[0],addr:x.display_name,lat:+x.lat,lng:+x.lon,type:x.addresstype||x.type,bbox:(x.boundingbox||[]).map(Number)}));
-      box.innerHTML='<label>Nel mondo</label>'+(geoRes.length?geoRes.map((g,i)=>`<div class="row" data-act="geo" data-id="${i}" style="cursor:pointer"><div><b>${esc(g.name)}</b><div class="meta">${esc(short(g.addr))}${me?' · '+fmtD(dist(me,g)):''}</div></div><span class="meta">›</span></div>`).join(''):'<p class="empty">Nessun posto trovato. Prova a scriverlo in un altro modo.</p>')+
-        '<p class="demo">Ricerca © OpenStreetMap</p>';
+    try{let src='osm';geoRes=[];
+      try{const c=me||(()=>{const m=ml.getCenter();return{lat:m.lat,lng:m.lng}})(),t=await svc(`a=cerca&q=${encodeURIComponent(q)}&lat=${c.lat.toFixed(4)}&lng=${c.lng.toFixed(4)}`);
+        if(t.attiva&&t.risultati&&t.risultati.length){src='tomtom';geoRes=t.risultati.map(x=>({...x,src:'tomtom'}))}}catch(e){}
+      if(!geoRes.length){const r=await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(q)}&limit=8&accept-language=it`);
+        const j=await r.json();
+        geoRes=j.map(x=>({name:x.name||String(x.display_name).split(',')[0],addr:x.display_name,lat:+x.lat,lng:+x.lon,type:x.addresstype||x.type,bbox:(x.boundingbox||[]).map(Number),src:'osm'}))}
+      box.innerHTML='<label>Nel mondo</label>'+(geoRes.length?geoRes.map((g,i)=>`<div class="row" data-act="geo" data-id="${i}" style="cursor:pointer"><div><b>${esc(g.name)}</b><div class="meta">${g.cat?esc(g.cat)+' · ':''}${esc(short(g.addr))}${me?' · '+fmtD(dist(me,g)):''}</div>${g.hours?`<div class="meta">${hoursTxt(g.hours)}</div>`:''}</div><span class="meta">›</span></div>`).join(''):'<p class="empty">Nessun posto trovato. Prova a scriverlo in un altro modo.</p>')+
+        (geoRes[0]&&geoRes[0].src==='tomtom'?'<p class="demo">Ricerca © TomTom</p>':'<p class="demo">Ricerca © OpenStreetMap</p>');
     }catch(err){box.innerHTML='<p class="empty">Ricerca non disponibile ora, riprova tra poco.</p>'}};
   draw();setTimeout(()=>$('#q').focus(),60);
 }
@@ -1324,8 +1396,10 @@ function openSpot(){
   const d=me?dist(me,s):null,big=AREA.includes(s.type),R=big?5000:1500;
   const posts=alive().filter(p=>dist(p,s)<=R).sort((a,b)=>b.t-a.t),pls=withD(db.places).filter(p=>dist(p,s)<=R);
   const qs=big?['Cosa succede oggi qui?','C\'è traffico per arrivare?','C\'è qualche evento?']:['C\'è coda adesso?','È aperto?','C\'è tanta gente?','Si trova parcheggio?'];
-  openModal(`<span class="tag cat">Cercato su OpenStreetMap</span><h3>${esc(s.name)}</h3>
+  openModal(`<span class="tag cat">${s.cat?esc(s.cat):s.src==='tomtom'?'Cercato su TomTom':'Cercato su OpenStreetMap'}</span><h3>${esc(s.name)}</h3>
     <div class="meta">${esc(short(s.addr))}${d!=null?' · a '+fmtD(d)+' da te':''}</div>
+    ${s.hours||s.phone||s.url?`<div class="spot-info">${s.hours?`<div class="meta">${hoursTxt(s.hours)}</div>`:''}${s.phone?`<div class="meta"><a href="tel:${esc(s.phone.replace(/[^+\d]/g,''))}">${esc(s.phone)}</a></div>`:''}${s.url?`<div class="meta"><a href="${esc(/^https?:/.test(s.url)?s.url:'https://'+s.url)}" target="_blank" rel="noopener">Sito web</a></div>`:''}</div>`:''}
+    <div class="eta" id="spEta"></div>
     <p class="meta" style="margin-top:8px">Non serve essere qui: la domanda arriva a chi è in zona.</p>
     <button class="sec" style="width:100%;margin-top:10px" data-act="whyAt" data-v="${s.lat},${s.lng}" data-id="${esc(s.name)}"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" style="vertical-align:-3px;margin-right:4px"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .8-1 1.5v.7M12 17h.01"/></svg>Perché? Cerca i motivi qui</button>
     <label>Domande veloci</label>
@@ -1335,6 +1409,7 @@ function openSpot(){
     ${posts.length?posts.map(p=>postCard(p)).join(''):'<p class="empty">Ancora nessuna. Fai la prima domanda.</p>'}
     <button class="sec" style="width:100%;margin-top:12px" data-act="zoneSpot">${ZONES.some(z=>dist(z,s)<300)?'Segui già questa zona ✓':'Segui questa zona'}</button>
     <div class="btns"><button class="sec" data-close>Chiudi</button><button class="pri" data-act="askSpot" data-v="">Chiedi a chi è lì</button></div>`,'spot');
+  fillEta($('#spEta'),s);
 }
 
 /* ---------- azioni ---------- */
@@ -1442,6 +1517,8 @@ const actions={
     if(k==='traffic')setTraffic(!PREF.traffic);
     if(k==='cams'){PREF.cams=!PREF.cams;savePref();if(PREF.cams)loadCams(true);else{camLayer.clearLayers();CAMS=[]}}
     if(k==='sim'){actions.sim();closeModal();return}
+    if(k==='reach'){await setReach(!PREF.reach)}
+    if(k==='ev'){PREF.ev=!PREF.ev;savePref();if(PREF.ev)loadEv(true);else{evLayer.clearLayers();EVS=[]}}
     if(k==='replay'){closeModal();setTab('map');$('#replay').classList.remove('hide');setReplay(-180);return}
     openLayers()},
   whyAt:(v,label)=>{const [a,b]=(label||'').split(',').map(Number);const [lat,lng]=v&&v.includes(',')?v.split(',').map(Number):[a,b];openWhy(lat,lng,v&&v.includes(',')?label:'')},
@@ -1450,6 +1527,7 @@ const actions={
   camWhy:id=>openCam(+id||id,WHYCAMS),
   camsHere:v=>{const [lat,lng]=v.split(',').map(Number);closeModal();setTab('map');map.setView([lat,lng],13);PREF.cams=true;savePref();setTimeout(()=>loadCams(true),400)},
   poster:id=>openPoster(id),
+  reachMin:async m=>{PREF.reachMin=+m;savePref();await setReach(true);openLayers()},
   mapF:id=>{mapF=id;renderMapUi();if(id==='friends'&&!friendLocs().length)toast('Nessun amico sta condividendo la posizione adesso')},
   share:async id=>{const p=db.posts.find(x=>x.id===id);if(!p)return;const url=APP_URL+'#post='+id,text=(p.type==='n'?'Notizia':'Domanda')+' su '+p.place+': '+p.text;
     try{if(navigator.share){await navigator.share({title:'App Locale',text,url});return}

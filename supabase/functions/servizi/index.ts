@@ -1,7 +1,11 @@
-// App Locale – V11 – funzione "servizi"
+// App Locale – V12 – funzione "servizi" (V12: ricerca, percorso col traffico, dove arrivo, colonnine – TomTom)
 // Fa da ponte verso i servizi esterni, così le chiavi restano sul server (Vault) e non nel codice pubblico.
 //   ?a=tile&z=&x=&y=           tessere del traffico dal vivo (TomTom)
 //   ?a=webcams&lat=&lng=&r=    webcam pubbliche vicine (Windy)
+//   ?a=cerca&q=&lat=&lng=      ricerca posti e indirizzi con categorie, telefono e orari (TomTom)
+//   ?a=percorso&lat=&lng=&tlat=&tlng=   quanto ci metto adesso: auto col traffico e a piedi (TomTom)
+//   ?a=raggio&lat=&lng=&min=   dove arrivo in N minuti in auto col traffico (TomTom)
+//   ?a=colonnine&lat=&lng=&r=  colonnine di ricarica vicine con disponibilità dal vivo (TomTom)
 //   ?a=perche&lat=&lng=&cc=&region=&prov=   possibili motivi in un posto: incidenti e code, webcam,
 //                               meteo (Open-Meteo), scioperi in Italia (dati MIT via onData), metro di Londra (TfL)
 // Serve l'accesso all'app (verify_jwt attivo). Le chiavi sono in Vault: tomtom_key, windy_key.
@@ -157,6 +161,95 @@ async function tfl() {
     linea: l.name, stato: s.statusSeverityDescription, motivo: (s.reason || "").replace(/^[^:]+:\s*/, "").slice(0, 220),
   }))).slice(0, 8);
 }
+// ---------- ricerca (TomTom Search) ----------
+const GEO_TYPE: Record<string, string> = {
+  Country: "country", CountrySubdivision: "state", CountrySecondarySubdivision: "county", CountryTertiarySubdivision: "county",
+  Municipality: "city", MunicipalitySubdivision: "suburb", Neighbourhood: "neighbourhood", PostalCodeArea: "postcode",
+};
+async function cerca(q: string, lat: number, lng: number) {
+  const k = (await getKeys()).tomtom_key;
+  if (!k) return { attiva: false, risultati: [] };
+  const bias = Number.isFinite(lat) && Number.isFinite(lng) ? `&lat=${lat.toFixed(4)}&lon=${lng.toFixed(4)}` : "";
+  const url = `https://api.tomtom.com/search/2/search/${encodeURIComponent(q.slice(0, 120))}.json?key=${k}&language=it-IT&limit=10` +
+    `&openingHours=nextSevenDays${bias}`;
+  const r = await fetch(url, { signal: timeout(8000) });
+  if (!r.ok) return { attiva: true, errore: `TomTom ${r.status}`, risultati: [] };
+  const d = await r.json();
+  return {
+    attiva: true,
+    risultati: (d.results || []).map((x: any) => {
+      const a = x.address || {}, vp = x.viewport || {};
+      const name = x.poi?.name || (x.type === "Geography" ? (a.municipality || a.countrySubdivision || a.country || a.freeformAddress) : a.freeformAddress);
+      return {
+        name, lat: x.position?.lat, lng: x.position?.lon,
+        addr: [a.freeformAddress, a.country].filter(Boolean).join(", "),
+        type: x.type === "Geography" ? (GEO_TYPE[x.entityType] || "city") : x.type === "POI" ? "poi" : "street",
+        cat: x.poi?.categories?.[0] || null,
+        phone: x.poi?.phone || null, url: x.poi?.url || null,
+        hours: x.poi?.openingHours?.timeRanges || null,
+        bbox: vp.topLeftPoint ? [vp.btmRightPoint.lat, vp.topLeftPoint.lat, vp.topLeftPoint.lon, vp.btmRightPoint.lon] : [],
+        d: Number.isFinite(x.dist) ? Math.round(x.dist) : null,
+      };
+    }).filter((x: any) => x.lat != null && x.name),
+  };
+}
+
+// ---------- quanto ci metto adesso (TomTom Routing) ----------
+async function percorso(lat: number, lng: number, tlat: number, tlng: number) {
+  const k = (await getKeys()).tomtom_key;
+  if (!k) return { attiva: false };
+  const pts = `${lat.toFixed(5)},${lng.toFixed(5)}:${tlat.toFixed(5)},${tlng.toFixed(5)}`;
+  const route = async (mode: string) => {
+    const r = await fetch(`https://api.tomtom.com/routing/1/calculateRoute/${pts}/json?key=${k}&travelMode=${mode}` +
+      (mode === "car" ? "&traffic=true&routeType=fastest&computeTravelTimeFor=all" : ""), { signal: timeout(8000) });
+    if (!r.ok) return null;
+    const s = (await r.json()).routes?.[0]?.summary;
+    return s ? { min: Math.max(1, Math.round(s.travelTimeInSeconds / 60)), ritardo_min: Math.round((s.trafficDelayInSeconds || 0) / 60),
+      km: Math.round(s.lengthInMeters / 100) / 10, arrivo: s.arrivalTime } : null;
+  };
+  const crow = distM([lat, lng], [tlat, tlng]);
+  const [auto, piedi] = await Promise.all([route("car"), crow <= 12000 ? route("pedestrian") : Promise.resolve(null)]);
+  return { attiva: true, auto, piedi };
+}
+
+// ---------- dove arrivo in N minuti (TomTom Reachable Range) ----------
+async function raggio(lat: number, lng: number, min: number) {
+  const k = (await getKeys()).tomtom_key;
+  if (!k) return { attiva: false, area: [] };
+  const r = await fetch(`https://api.tomtom.com/routing/1/calculateReachableRange/${lat.toFixed(5)},${lng.toFixed(5)}/json?key=${k}` +
+    `&timeBudgetInSec=${Math.round(Math.min(Math.max(min, 5), 60) * 60)}&traffic=true&travelMode=car`, { signal: timeout(10000) });
+  if (!r.ok) return { attiva: true, errore: `TomTom ${r.status}`, area: [] };
+  const b = (await r.json()).reachableRange?.boundary || [];
+  return { attiva: true, area: b.map((p: any) => [p.latitude, p.longitude]) };
+}
+
+// ---------- colonnine di ricarica con disponibilità (TomTom EV) ----------
+async function colonnine(lat: number, lng: number, rKm: number) {
+  const k = (await getKeys()).tomtom_key;
+  if (!k) return { attiva: false, colonnine: [] };
+  const r = await fetch(`https://api.tomtom.com/search/2/nearbySearch/.json?key=${k}&lat=${lat.toFixed(4)}&lon=${lng.toFixed(4)}` +
+    `&radius=${Math.round(Math.min(Math.max(rKm, 1), 10) * 1000)}&limit=25&categorySet=7309&language=it-IT`, { signal: timeout(8000) });
+  if (!r.ok) return { attiva: true, errore: `TomTom ${r.status}`, colonnine: [] };
+  const list = ((await r.json()).results || []).filter((x: any) => x.position);
+  const out = await Promise.all(list.map(async (x: any, i: number) => {
+    const id = x.dataSources?.chargingAvailability?.id;
+    let tot = 0, lib = 0, occ = 0, kw = 0, noto = false;
+    (x.chargingPark?.connectors || []).forEach((c: any) => { kw = Math.max(kw, c.ratedPowerKW || 0); });
+    if (id && i < 15) {
+      try {
+        const a = await fetch(`https://api.tomtom.com/search/2/chargingAvailability.json?key=${k}&chargingAvailability=${id}`, { signal: timeout(6000) });
+        if (a.ok) (await a.json()).connectors?.forEach((c: any) => {
+          noto = true; tot += c.total || 0; lib += c.availability?.current?.available || 0; occ += c.availability?.current?.occupied || 0;
+          (c.availability?.perPowerLevel || []).forEach((p: any) => { kw = Math.max(kw, p.powerKW || 0); });
+        });
+      } catch { /* disponibilità non nota */ }
+    }
+    return { id: x.id, nome: x.poi?.name || "Colonnina", lat: x.position.lat, lng: x.position.lon,
+      ind: x.address?.freeformAddress || "", d: Math.round(x.dist || 0), kw, tot, lib, occ, noto };
+  }));
+  return { attiva: true, colonnine: out };
+}
+
 const inLondon = (lat: number, lng: number) => lat > 51.28 && lat < 51.70 && lng > -0.52 && lng < 0.34;
 
 Deno.serve(async (req: Request) => {
@@ -168,14 +261,37 @@ Deno.serve(async (req: Request) => {
       if (![z, x, y].every(Number.isInteger) || z < 0 || z > 22) return json({ error: "tessera non valida" }, 400);
       const k = (await getKeys()).tomtom_key;
       if (!k) return new Response(null, { status: 204, headers: CORS });
-      const r = await fetch(`https://api.tomtom.com/traffic/map/4/tile/flow/relative0/${z}/${x}/${y}.png?key=${k}&tileSize=256&thickness=10`, { signal: timeout(8000) });
+      const r = await fetch(`https://api.tomtom.com/traffic/map/4/tile/flow/relative/${z}/${x}/${y}.png?key=${k}&tileSize=256&thickness=10`, { signal: timeout(8000) });
       return new Response(r.ok ? await r.arrayBuffer() : null, {
         status: r.ok ? 200 : r.status,
         headers: { ...CORS, "Content-Type": "image/png", "Cache-Control": "public, max-age=120" },
       });
     }
     const lat = num(u.searchParams.get("lat")), lng = num(u.searchParams.get("lng"));
+    if (a === "cerca" && !(Number.isFinite(lat) && Number.isFinite(lng))) {
+      const q = (u.searchParams.get("q") || "").trim();
+      if (q.length < 2) return json({ error: "testo troppo corto" }, 400);
+      return json(await cerca(q, NaN, NaN), 200, 300);
+    }
     if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) return json({ error: "posizione non valida" }, 400);
+    if (a === "cerca") {
+      const q = (u.searchParams.get("q") || "").trim();
+      if (q.length < 2) return json({ error: "testo troppo corto" }, 400);
+      return json(await cerca(q, lat, lng), 200, 300);
+    }
+    if (a === "percorso") {
+      const tlat = num(u.searchParams.get("tlat")), tlng = num(u.searchParams.get("tlng"));
+      if (!Number.isFinite(tlat) || !Number.isFinite(tlng)) return json({ error: "destinazione non valida" }, 400);
+      return json(await percorso(lat, lng, tlat, tlng), 200, 60);
+    }
+    if (a === "raggio") {
+      const m = num(u.searchParams.get("min"));
+      return json(await raggio(lat, lng, Number.isFinite(m) ? m : 15), 200, 120);
+    }
+    if (a === "colonnine") {
+      const r = num(u.searchParams.get("r"));
+      return json(await colonnine(lat, lng, Number.isFinite(r) ? r : 3), 200, 120);
+    }
     if (a === "webcams") {
       const r = num(u.searchParams.get("r"));
       return json(await webcams(lat, lng, Number.isFinite(r) ? r : 10), 200, 300);
